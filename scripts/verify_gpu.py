@@ -31,9 +31,10 @@ import platform
 import sys
 import time
 import traceback
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -372,8 +373,11 @@ def main() -> int:
         ]
         if args.full:
             planned.append(
-                (7, f"Soak test ({args.soak_minutes:.0f} min)",
-                 lambda: check_7_soak(device, args.soak_minutes))
+                (
+                    7,
+                    f"Soak test ({args.soak_minutes:.0f} min)",
+                    lambda: check_7_soak(device, args.soak_minutes),
+                )
             )
         planned.append((8, "VRAM headroom probe", lambda: check_8_vram(device, info)))
 
@@ -383,8 +387,12 @@ def main() -> int:
         print(_fmt(result))
 
     if not args.full and not args.quick:
-        skipped = CheckResult(7, f"Soak test ({args.soak_minutes:.0f} min)", SKIP,
-                              "Not run. Use --full before committing to this stack.")
+        skipped = CheckResult(
+            7,
+            f"Soak test ({args.soak_minutes:.0f} min)",
+            SKIP,
+            "Not run. Use --full before committing to this stack.",
+        )
         results.append(skipped)
         print(_fmt(skipped))
 
@@ -392,15 +400,18 @@ def main() -> int:
     skipped = [r for r in results if r.status == SKIP]
 
     print("-" * 78)
-    print(f"{len(results) - len(failed) - len(skipped)} passed, "
-          f"{len(failed)} failed, {len(skipped)} skipped")
+    print(
+        f"{len(results) - len(failed) - len(skipped)} passed, "
+        f"{len(failed)} failed, {len(skipped)} skipped"
+    )
 
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(
             json.dumps(
                 {"device": info.to_dict(), "checks": [asdict(r) for r in results]},
-                indent=2, default=str,
+                indent=2,
+                default=str,
             ),
             encoding="utf-8",
         )

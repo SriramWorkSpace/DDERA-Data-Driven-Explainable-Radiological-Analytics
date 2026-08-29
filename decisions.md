@@ -284,3 +284,68 @@ config is stored alongside the metrics it produced.
 
 **Consequences.** No hosted live training curves. W&B can be added later as an optional mirror
 without changing the artifact schema.
+
+---
+
+## ADR-011 - Split prevalence checked against sampling noise, not a fixed tolerance
+**Date:** 2026-08-30 - **Status:** Accepted
+
+**Context.** `check_split_integrity` originally flagged any split whose target prevalence
+drifted more than 5% relative from the others. On a correct patient-level split of 300
+synthetic patients this fired immediately: the val split holds ~10% of patients (~30), where
+ordinary binomial noise moves prevalence by 10-15% relative. The check was failing on
+correct data.
+
+**Decision.** Convert each split's prevalence to a z-score against the pooled rate, using the
+**patient count** as the effective sample size, and flag only when `|z| > 3`.
+
+**Rationale.** A fixed percentage tolerance ignores split size, so it is simultaneously too
+strict on small splits and too lenient on large ones. The patient count is the right
+effective n because images from one patient are correlated; using the image count would
+overstate the available information and make the test over-sensitive. Verified empirically:
+a correct split scores |z| < 0.5, while a deliberately skewed one scores |z| ~ 11.
+
+**Effect on the research question.** None on results; this is a data-quality guard, not a
+modelling choice. Indirectly protective: a check that cries wolf on correct splits is a check
+people learn to ignore, and patient-level split integrity is the guarantee every metric in
+this project rests on.
+
+**Consequences.** `check_split_integrity` now reports `prevalence_z_scores` and
+`prevalence_pooled` alongside the raw prevalences. Covered by two tests asserting both
+directions (no false alarm on a clean split, detection of a deliberate skew).
+
+---
+
+## ADR-012 - Leakage and incompleteness measured as separate quantities
+**Date:** 2026-08-30 - **Status:** Accepted
+
+**Context.** The CBM literature routinely uses "leakage" for two different failures. While
+testing `soft_vs_hard_leakage` the distinction became concrete: on noisy synthetic concepts
+the measure came out *negative*, because thresholding a noisy soft concept moves it back
+toward its true binary value. Hardening denoised the bottleneck rather than destroying
+smuggled information.
+
+**Decision.** Measure and report the two failures separately, and treat the sign of the
+soft-vs-hard measure as meaningful:
+
+- **Leakage** (`soft_vs_hard_leakage`, positive value) - soft concept values encode
+  sub-symbolic information a reasoner trained on them learns to exploit. A defect: the
+  bottleneck looks intact while the explanation has stopped being true.
+- **Denoising** (same measure, negative value) - hardening improves AUROC. A
+  concept-calibration signal, not smuggled information.
+- **Incompleteness** (`residual_probe_leakage`, and the Phase 4 hybrid-k sweep) - the
+  concepts honestly do not carry all task-relevant information. A finding, not a defect.
+
+`ddera.data.synthetic` gained a `soft_leak_strength` knob that injects target information
+into concept *probabilities* while leaving their hard thresholds intact, so the positive
+direction can be tested rather than assumed.
+
+**Effect on the research question.** Materially sharpens it. Conflating the two would let an
+incomplete-but-honest bottleneck be reported as a leaking one (or the reverse), which would
+misattribute the interpretability cost. Since quantifying that cost *is* the research
+question, the distinction is load-bearing rather than terminological.
+
+**Consequences.** Three regimes are now asserted discriminatively in
+`tests/test_xai_harness.py`: positive leakage with a reasoner fitted on leaked soft concepts,
+negative on denoising, and near-zero for a confident predictor. Results reporting must quote
+the sign and the interpretation string, never `abs(leakage)`.

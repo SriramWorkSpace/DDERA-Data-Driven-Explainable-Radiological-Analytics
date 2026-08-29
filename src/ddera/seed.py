@@ -25,7 +25,11 @@ def set_seed(seed: int = 42, *, deterministic: bool = True) -> None:
     """
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
-    np.random.seed(seed)
+    # NPY002 suppressed deliberately. Seeding the legacy GLOBAL RNG is the entire point of
+    # this call: scikit-learn, albumentations and other libraries draw from it internally,
+    # and a np.random.Generator instance cannot make those reproducible. Our own code uses
+    # default_rng() throughout; this line exists purely to pin third-party randomness.
+    np.random.seed(seed)  # noqa: NPY002
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
@@ -38,7 +42,7 @@ def set_seed(seed: int = 42, *, deterministic: bool = True) -> None:
 def seed_worker(worker_id: int) -> None:  # noqa: ARG001 - signature fixed by DataLoader
     """DataLoader ``worker_init_fn``: keeps augmentation reproducible across workers."""
     worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
+    np.random.seed(worker_seed)  # noqa: NPY002 - same rationale: pins library-internal RNGs
     random.seed(worker_seed)
 
 
