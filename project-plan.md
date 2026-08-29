@@ -18,18 +18,18 @@ never methodology.**
 - [x] `decisions.md` — ADR-001…010 seeded
 - [x] `ARCHITECTURE.md` — pathway, module map, artifact schema
 - [x] `project-plan.md` — this file
-- [ ] `README.md` — badges, pitch, quickstart, disclaimer
-- [ ] `pyproject.toml`, `requirements/`, `.gitignore`, `.pre-commit-config.yaml`
-- [ ] `src/ddera` package skeleton
-- [ ] Python 3.11 virtual environment
+- [x] `README.md` — badges, pitch, quickstart, disclaimer
+- [x] `pyproject.toml`, `requirements/`, `.gitignore`, `.pre-commit-config.yaml`
+- [x] `src/ddera` package skeleton (data, eval, xai implemented; 195 tests passing)
+- [ ] Virtual environment (3.11 on Windows analysis box, 3.12 on the Linux training box)
 
 ### 0.2 GPU bring-up 🔒
 Ordered ladder — stop at the first rung that passes the full gate; record versions in `decisions.md`
 (ADR-009). **Do not install an old ROCm version on the basis of forum reports.** Test current
 supported combinations first; any step down must be justified by an observed, recorded failure.
 
-- [ ] Rung 1 — Ubuntu 24.04.x (HWE) + current stable ROCm 7.x + matching PyTorch ROCm wheel,
-      `HSA_OVERRIDE_GFX_VERSION=10.3.0`
+- [ ] Rung 1 — Ubuntu 24.04.x + current stable ROCm + matching PyTorch ROCm wheel,
+      `HSA_OVERRIDE_GFX_VERSION=10.3.0` — **step-by-step: [`docs/SETUP-LINUX-ROCM.md`](docs/SETUP-LINUX-ROCM.md)**
 - [ ] Rung 2 — `rocm/pytorch` Docker image (isolates the stack; easy version sweeping)
 - [ ] Rung 3 — step ROCm minor versions down via Docker tags, newest-first
 - [ ] Rung 4 — Windows + `torch-directml` (approved fallback, flagged as degraded)
@@ -52,8 +52,8 @@ supported combinations first; any step down must be justified by an observed, re
 > do not silently degrade.
 
 ### 0.3 Version control
-- [ ] `git init`, `.gitignore`, first commit
-- [ ] `git remote add origin` → the GitHub repo
+- [x] `git init`, `.gitignore`, first commit
+- [x] `git remote add origin` → the GitHub repo
 - [ ] Push (**needs explicit go-ahead**)
 
 ### 0.4 Long-lead items — start now, used much later

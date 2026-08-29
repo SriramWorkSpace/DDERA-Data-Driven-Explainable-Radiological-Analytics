@@ -197,6 +197,12 @@ current ROCm PyTorch documentation targets 3.12 and below. 3.11 is already insta
 
 **Consequences.** All environment docs and CI pin 3.11.
 
+**Amendment (2026-08-30).** Ubuntu 24.04 ships Python 3.12, and AMD validates ROCm PyTorch
+against 3.12 on that release. Forcing 3.11 onto the Linux training box would mean building a
+Python outside AMD's validated combination for no benefit. `pyproject.toml` therefore accepts
+`>=3.11,<3.13`: **3.11 on the Windows analysis/dashboard machine, 3.12 on the Linux training
+box.** Both are covered by the same test suite. Still no effect on the research question.
+
 ---
 
 ## ADR-008 — Cached encoder features as the standard experiment substrate

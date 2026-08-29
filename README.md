@@ -7,7 +7,7 @@
 **A methodology for building predictive models that are explainable *by design* — not explained
 after the fact.**
 
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![ROCm](https://img.shields.io/badge/AMD%20ROCm-ED1C24?style=flat-square&logo=amd&logoColor=white)](https://rocm.docs.amd.com/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?style=flat-square&logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
@@ -215,6 +215,8 @@ ADR-009.
 
 ROCm does **not** support this card on Windows or WSL2 (both are RDNA3/RDNA4 only). NVIDIA CUDA and
 CPU are supported transparently via `ddera/device.py`.
+
+Full dual-boot and ROCm procedure: [`docs/SETUP-LINUX-ROCM.md`](docs/SETUP-LINUX-ROCM.md).
 
 ## Repository layout
 
