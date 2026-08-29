@@ -1,0 +1,104 @@
+# DDERA concept specification: CheXpert v1
+#
+# This file is the single source of truth for what counts as a "concept" and what counts as
+# the prediction target. See ADR-003 (target/concept split) and ADR-004 (uncertainty policy).
+#
+# Phase 8 adds configs/concepts/vindr_v1.yaml with a different concept set and targets. If
+# switching domains requires anything more than a new file like this one, the domain-agnostic
+# claim (Invariant 9) has failed and we report that.
+
+name: chexpert_v1
+domain: chest_xray
+dataset: chexpert
+
+# ---------------------------------------------------------------------------------------
+# Target: the diagnosis to predict.
+#
+# Pneumonia is the only CheXpert label that is a true *diagnosis inferred from findings*
+# rather than a directly visible radiographic sign. That gives a clinically coherent
+# bottleneck: findings -> diagnosis.
+# ---------------------------------------------------------------------------------------
+target: Pneumonia
+
+# ---------------------------------------------------------------------------------------
+# Concepts: the radiographic findings the model must reason through.
+#
+# Everything downstream of the concept head sees ONLY these values (Invariant 4).
+# ---------------------------------------------------------------------------------------
+concepts:
+  - Enlarged Cardiomediastinum
+  - Cardiomegaly
+  - Lung Opacity
+  - Lung Lesion
+  - Edema
+  - Consolidation
+  - Atelectasis
+  - Pneumothorax
+  - Pleural Effusion
+  - Pleural Other
+  - Fracture
+  - Support Devices
+
+excluded:
+  - label: No Finding
+    reason: >
+      Definitionally derivable from the other observations, so including it as a concept
+      would guarantee leakage and make the bottleneck circular.
+  - label: Pneumonia
+    reason: It is the prediction target.
+
+# ---------------------------------------------------------------------------------------
+# Concepts expected to be contaminated with the target by clinical definition.
+#
+# Consolidation and Lung Opacity ARE the radiographic evidence of pneumonia, so a CBM could
+# look excellent trivially. We do not remove them (that would be clinically wrong) -- we
+# measure the contamination. Phase 5 leakage quantification reports these explicitly.
+# ---------------------------------------------------------------------------------------
+expected_leakage_watchlist:
+  - Consolidation
+  - Lung Opacity
+
+# ---------------------------------------------------------------------------------------
+# Uncertainty policy (ADR-004).
+#
+# CheXpert labels: 1 = positive, 0 = negative, -1 = uncertain, blank = not mentioned.
+# ---------------------------------------------------------------------------------------
+uncertainty:
+  concept_policy: u_mask      # masked BCE: -1 entries contribute no gradient
+  target_policy: u_ignore     # drop samples whose target label is uncertain
+  blank_policy: negative      # CheXpert convention
+  sensitivity_analysis:       # mandatory, not optional
+    - u_zeros
+    - u_ones
+
+# ---------------------------------------------------------------------------------------
+# Escalation rule, committed in advance so the choice stays data-driven (ADR-003).
+#
+# Pneumonia is sparse in CheXpert. If the test split cannot support a stable estimate, we
+# switch to a leave-one-out sweep over five denser targets. That sweep runs in Phase 5
+# regardless, because it doubles as the leakage stress test: some of its target/concept
+# pairs are contaminated by construction (e.g. Enlarged Cardiomediastinum -> Cardiomegaly).
+# ---------------------------------------------------------------------------------------
+escalation:
+  trigger:
+    min_test_positives: 250
+    max_auroc_ci_width: 0.10
+  fallback_targets:
+    - Atelectasis
+    - Cardiomegaly
+    - Consolidation
+    - Edema
+    - Pleural Effusion
+  fallback_concept_rule: >
+    For each fallback target, concepts are the remaining 13 observations (all 14 minus the
+    target). No Finding stays excluded throughout.
+
+# ---------------------------------------------------------------------------------------
+# Cohort definition (ADR-005).
+# ---------------------------------------------------------------------------------------
+cohort:
+  views: [AP, PA]             # frontal only in v1; lateral out of scope
+  split_level: patient        # NEVER image-level; enforced by tests/test_splits.py
+  split_ratios: {train: 0.70, val: 0.10, test: 0.20}
+  stratify_on: target
+  external_eval: valid.csv    # official 234-study radiologist-consensus set, held separately

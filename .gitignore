@@ -1,0 +1,40 @@
+# Data - never commit datasets (anchored: must not match src/ddera/data/)
+/data/
+*.dcm
+*.jpg
+*.jpeg
+*.png
+!docs/images/*.png
+!app/assets/*.png
+!flow_diagram.png
+!end-to-end-flow.png
+
+# Run artifacts (large); runs_index.csv IS committed
+experiments/runs/*
+!experiments/runs/.gitkeep
+*.pt
+*.pth
+*.ckpt
+*.npy
+*.memmap
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Reports (generated)
+reports/figures/*
+!reports/figures/.gitkeep
+reports/*.html
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

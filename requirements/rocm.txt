@@ -1,0 +1,16 @@
+# PyTorch for AMD ROCm (native Linux only).
+#
+# Do NOT pin blindly. Phase 0 (ADR-009) determines the exact working combination for
+# gfx1031 -> gfx1030. Install the wheel matching the ROCm version verified by
+# scripts/verify_gpu.py, then record the exact versions in decisions.md.
+#
+# Consult https://pytorch.org/get-started/locally/ (Linux + pip + ROCm) for the current index URL,
+# e.g.:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm<VERSION>
+#
+# Runtime requirement:
+#   export HSA_OVERRIDE_GFX_VERSION=10.3.0
+#
+# Verified combination: <FILL IN AFTER GATE 0>
+torch
+torchvision

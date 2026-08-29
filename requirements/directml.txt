@@ -1,0 +1,4 @@
+# Fallback backend: Windows + DirectML (ADR-009 rung 4).
+# DEGRADED PATH - DirectML is in maintenance mode on an older PyTorch with op-coverage gaps.
+# Only use after the ROCm ladder has been shown to fail, and record that failure in decisions.md.
+torch-directml
