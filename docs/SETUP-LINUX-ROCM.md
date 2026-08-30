@@ -303,6 +303,11 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm7
 
 pip install -r requirements/base.txt -r requirements/dev.txt
 pip install -e .
+
+# Activate the git hooks in .pre-commit-config.yaml (ruff + basic hygiene checks).
+# The package above only puts the `pre-commit` command on PATH - without this it
+# is installed but wired into nothing, and hooks silently never run on commit.
+pre-commit install
 ```
 
 Quick sanity check before the real gate:
@@ -371,6 +376,34 @@ packaging has changed and current releases should be tried first.
 | 2 | `docker run -it --device=/dev/kfd --device=/dev/dri --group-add video rocm/pytorch:latest` — isolates the stack and lets you try versions without reinstalling |
 | 3 | Step ROCm minor versions **down** via `rocm/pytorch` Docker tags, newest first |
 | 4 | Windows + `torch-directml` — approved fallback, flagged as degraded |
+
+### Rung 2/3 prerequisite: install Docker Engine
+
+Not needed unless rung 1 fails — skip this if the host install passed. Current official
+steps ([docs.docker.com](https://docs.docker.com/engine/install/ubuntu/)):
+
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Run docker without sudo (log out and back in for this to take effect)
+sudo usermod -aG docker $LOGNAME
+```
 
 ### Common failures
 
