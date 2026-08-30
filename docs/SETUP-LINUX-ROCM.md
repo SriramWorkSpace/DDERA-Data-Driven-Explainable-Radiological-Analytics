@@ -314,6 +314,11 @@ python -c "import torch; print(torch.__version__, torch.version.hip, torch.cuda.
 Expect a version string, a HIP version (**not** `None`), and `True`. `torch.cuda` is the
 correct API on ROCm — the name is historical.
 
+> **Starting a Claude Code session here for the first time?** Before Part 8, open `claude`
+> in this repo and paste in [`RESUME.md`](RESUME.md) as your first message — it re-establishes
+> the project context that a plain `git clone` doesn't carry, and Part 8 is literally its
+> first task.
+
 ---
 
 ## Part 8 — Run the verification gate 🔒

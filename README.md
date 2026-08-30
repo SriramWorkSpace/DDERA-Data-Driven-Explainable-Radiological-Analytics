@@ -217,6 +217,8 @@ ROCm does **not** support this card on Windows or WSL2 (both are RDNA3/RDNA4 onl
 CPU are supported transparently via `ddera/device.py`.
 
 Full dual-boot and ROCm procedure: [`docs/SETUP-LINUX-ROCM.md`](docs/SETUP-LINUX-ROCM.md).
+Starting a new Claude Code session on that machine? Paste [`docs/RESUME.md`](docs/RESUME.md)
+as your first message to bring it up to speed.
 
 ## Repository layout
 
