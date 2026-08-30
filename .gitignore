@@ -38,3 +38,6 @@ reports/*.html
 Thumbs.db
 .vscode/
 .idea/
+
+# Local analysis tooling (not project source)
+/graphify-out/

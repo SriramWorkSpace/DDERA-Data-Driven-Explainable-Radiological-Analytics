@@ -11,10 +11,10 @@ there list RDNA3/RDNA4 only. Native Linux is the only path to the card. See
 officially packaged target in current ROCm and is built into the PyTorch ROCm wheels.
 `HSA_OVERRIDE_GFX_VERSION=10.3.0` makes the `gfx1031` card load those shipped `gfx1030`
 code objects. The two are close enough that this normally works — but it is unsupported, so
-Part 7's verification gate exists to prove it rather than assume it.
+Part 8's verification gate exists to prove it rather than assume it.
 
-> **Time budget.** Parts 0–2 take 1–2 hours (mostly waiting). Parts 3–7 take about an hour.
-> Do Part 0 carefully; it is the only part that can lose data.
+> **Time budget.** Parts 0–2 take 1–2 hours (mostly waiting). Parts 3–8 take about
+> 90 minutes. Do Part 0 carefully; it is the only part that can lose data.
 
 ---
 
@@ -126,11 +126,93 @@ sudo apt install -y git curl wget build-essential python3-venv python3-dev
 lspci | grep -Ei 'vga|display|3d'
 ```
 
-You should see two AMD devices. That is expected and is dealt with in Part 5.
+You should see two AMD devices. That is expected and is dealt with in Part 6.
 
 ---
 
-## Part 4 — Install ROCm
+## Part 4 — Dev tooling: VS Code, GitHub CLI, Claude Code
+
+Get the everyday environment working before touching ROCm — it makes every later part
+(editing configs, running the verification gate, pushing ADR updates) easier to do from
+one place.
+
+### 4.1 Git identity
+
+Match the identity already used for this repo's commits, so history stays consistent
+across machines:
+
+```bash
+git config --global user.name "SriramWorkSpace"
+git config --global user.email "sriram.madala06@gmail.com"
+git config --global init.defaultBranch main
+```
+
+### 4.2 GitHub CLI (`gh`) — for pushing without juggling SSH keys
+
+Official apt install ([cli.github.com](https://cli.github.com)):
+
+```bash
+(type -p wget >/dev/null || (sudo apt update && sudo apt install wget -y)) \
+  && sudo mkdir -p -m 755 /etc/apt/keyrings \
+  && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+  && cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+  && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+  && sudo mkdir -p -m 755 /etc/apt/sources.list.d \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+  && sudo apt update \
+  && sudo apt install gh -y
+
+gh auth login   # choose GitHub.com -> HTTPS -> login with a browser
+```
+
+`gh auth login` also configures git's credential helper, so a plain `git push` on the
+DDERA repo (cloned in Part 7) works afterward without further setup.
+
+### 4.3 Visual Studio Code
+
+Official Microsoft apt repository ([code.visualstudio.com](https://code.visualstudio.com/docs/setup/linux)):
+
+```bash
+sudo apt update
+sudo apt install -y wget gpg apt-transport-https
+
+wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor \
+  | sudo tee /usr/share/keyrings/packages.microsoft.gpg > /dev/null
+echo "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" \
+  | sudo tee /etc/apt/sources.list.d/vscode.list
+
+sudo apt update
+sudo apt install -y code
+```
+
+This registers Microsoft's repository, so `code` updates automatically with
+`sudo apt upgrade` from then on. Launch it with `code .` from inside the cloned repo
+(Part 7) once that exists — VS Code's Python extension will offer to pick up `.venv`
+automatically.
+
+### 4.4 Claude Code
+
+Official native installer ([code.claude.com](https://code.claude.com/docs/en/setup)),
+supports Ubuntu 20.04+:
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+```bash
+claude --version    # confirm it installed
+claude              # first run: follow the browser login prompt
+```
+
+Optional: install the [Claude Code VS Code extension](https://code.claude.com/docs/en/vs-code)
+from the Extensions panel (search "Claude Code") to run it inside the editor instead of a
+separate terminal.
+
+> Native installs auto-update in the background — nothing further to maintain.
+
+---
+
+## Part 5 — Install ROCm
 
 Commands below follow AMD's current
 [install-on-linux quick start](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/quick-start.html).
@@ -138,25 +220,25 @@ Commands below follow AMD's current
 URL moves over time, and using a stale one is the most common way this goes wrong.
 
 ```bash
-# 4.1  Register AMD's repository (verify the version number against the docs first)
+# 5.1  Register AMD's repository (verify the version number against the docs first)
 wget https://repo.radeon.com/amdgpu-install/7.2.4/ubuntu/noble/amdgpu-install_7.2.4.70204-1_all.deb
 sudo apt install ./amdgpu-install_7.2.4.70204-1_all.deb
 sudo apt update
 
-# 4.2  Kernel driver
+# 5.2  Kernel driver
 sudo apt install -y "linux-headers-$(uname -r)" "linux-modules-extra-$(uname -r)"
 sudo apt install -y amdgpu-dkms
 
-# 4.3  ROCm itself (large download, ~30 GB installed)
+# 5.3  ROCm itself (large download, ~30 GB installed)
 sudo apt install -y python3-setuptools python3-wheel
 sudo usermod -a -G render,video $LOGNAME
 sudo apt install -y rocm
 
-# 4.4  Reboot — required, not optional
+# 5.4  Reboot — required, not optional
 sudo reboot
 ```
 
-### 4.5 Confirm ROCm sees the card
+### 5.5 Confirm ROCm sees the card
 
 ```bash
 rocminfo | grep -E 'Name|gfx'
@@ -164,7 +246,7 @@ rocm-smi
 ```
 
 You are looking for **`gfx1031`** in the output. You will probably also see `gfx90c` — that
-is the Ryzen iGPU, and Part 5 handles it.
+is the Ryzen iGPU, and Part 6 handles it.
 
 > If `rocminfo` reports no agents: confirm Secure Boot is off (`mokutil --sb-state`), that
 > `dkms status` shows amdgpu built for your kernel, and that you have logged out and back in
@@ -172,7 +254,7 @@ is the Ryzen iGPU, and Part 5 handles it.
 
 ---
 
-## Part 5 — Configure for `gfx1031` ⚠️ *the part people get wrong*
+## Part 6 — Configure for `gfx1031` ⚠️ *the part people get wrong*
 
 Two environment variables, and the second matters more than most guides admit.
 
@@ -203,7 +285,7 @@ rocminfo | grep gfx        # should now show only gfx1031
 
 ---
 
-## Part 6 — PyTorch and DDERA
+## Part 7 — PyTorch and DDERA
 
 Ubuntu 24.04 ships Python 3.12, which is what AMD validates for ROCm PyTorch. DDERA supports
 3.11–3.12, so use the system Python here rather than installing 3.11.
@@ -234,7 +316,7 @@ correct API on ROCm — the name is historical.
 
 ---
 
-## Part 7 — Run the verification gate 🔒
+## Part 8 — Run the verification gate 🔒
 
 This is the ADR-009 gate. **No training begins until it passes.**
 
@@ -272,7 +354,7 @@ ruff check src/ tests/ scripts/
 
 ---
 
-## Part 8 — If the gate fails
+## Part 9 — If the gate fails
 
 Work the ADR-009 ladder **in order**, and record each failure in `decisions.md` before
 stepping down. Do not jump to an old ROCm version on the strength of a forum post; the
@@ -291,7 +373,7 @@ packaging has changed and current releases should be tried first.
 |---|---|
 | `torch.cuda.is_available()` is `False` | You installed the CPU or CUDA wheel. Reinstall from the ROCm index URL. |
 | `rocminfo` shows no agents | Secure Boot still on, `amdgpu-dkms` not built, or you have not re-logged in since `usermod`. |
-| Crash the moment a conv runs | `HSA_OVERRIDE_GFX_VERSION` unset, or the iGPU is still visible — set `HIP_VISIBLE_DEVICES` (Part 5). |
+| Crash the moment a conv runs | `HSA_OVERRIDE_GFX_VERSION` unset, or the iGPU is still visible — set `HIP_VISIBLE_DEVICES` (Part 6). |
 | Check 3 (conv2d) fails or SIGSEGVs | The known `gfx1031` risk. Record it, then move to rung 2. |
 | Out of memory at batch 32 | Normal on 12 GB at 320 px. Use the batch size check 8 reports. |
 | Non-finite gradients under AMP | Prefer bf16 over fp16; `device.py` already selects bf16 where supported. |
@@ -306,6 +388,6 @@ source .venv/bin/activate
 python scripts/verify_gpu.py --quick     # 10-second sanity check
 ```
 
-The environment variables from Part 5 are in `~/.bashrc`, so they apply automatically. If you
+The environment variables from Part 6 are in `~/.bashrc`, so they apply automatically. If you
 ever move to a different machine or GPU, re-run the full gate and add a new ADR — per
 Invariants 7 and 8 the backend may change, but the methodology may not.
