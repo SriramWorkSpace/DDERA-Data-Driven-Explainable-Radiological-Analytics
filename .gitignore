@@ -39,5 +39,10 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Local analysis tooling (not project source)
-/graphify-out/
+# Graphify: the graph outputs (graph.json/.html, GRAPH_REPORT.md, manifest.json,
+# cost.json, .graphify_labels.json) ARE committed as project documentation.
+# The extraction cache and machine-local absolute paths are not - they are
+# tool-version-specific and would be wrong on a different machine.
+/graphify-out/cache/
+/graphify-out/.graphify_root
+/graphify-out/.graphify_python
