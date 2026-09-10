@@ -18,10 +18,10 @@
     "semantic_hash": "df3bbebfa06fa5275caa844a5bf773a0"
   },
   "src/ddera/config.py": {
-    "mtime": 1788978971.5920756,
-    "seen": 1788981098.6506093,
-    "ast_hash": "2e10f84cbe3efe5d204cf8dde036d74f",
-    "semantic_hash": "2e10f84cbe3efe5d204cf8dde036d74f"
+    "mtime": 1789037069.2767208,
+    "seen": 1789037366.3616474,
+    "ast_hash": "06e14b84de9cc32ad020c2dd1d21f231",
+    "semantic_hash": ""
   },
   "src/ddera/data/__init__.py": {
     "mtime": 1788978971.5920756,
@@ -30,10 +30,10 @@
     "semantic_hash": "0192af31d959d31a41ca25dbaa1b0a67"
   },
   "src/ddera/data/chexpert.py": {
-    "mtime": 1788978971.592172,
-    "seen": 1788981098.6506147,
-    "ast_hash": "4349f8d7799d07b4a0ef2568612e6bc2",
-    "semantic_hash": "4349f8d7799d07b4a0ef2568612e6bc2"
+    "mtime": 1789037096.8079772,
+    "seen": 1789037366.361652,
+    "ast_hash": "b3f88a2dc0c8cecbd9423e23e08a6cb9",
+    "semantic_hash": ""
   },
   "src/ddera/data/labels.py": {
     "mtime": 1788978971.5922663,
@@ -42,10 +42,10 @@
     "semantic_hash": "4526e333bf093c90cb7614c354fa37ac"
   },
   "src/ddera/data/splits.py": {
-    "mtime": 1788978971.5923314,
-    "seen": 1788981098.6506205,
-    "ast_hash": "2011c432b5f1b7731807e3a3c53277ca",
-    "semantic_hash": "2011c432b5f1b7731807e3a3c53277ca"
+    "mtime": 1789037278.7742286,
+    "seen": 1789037366.361654,
+    "ast_hash": "5b4b2a614a262b1050fff74ac7464aa7",
+    "semantic_hash": ""
   },
   "src/ddera/data/synthetic.py": {
     "mtime": 1788978971.5923872,
@@ -375,6 +375,24 @@
     "mtime": 1788978971.5784245,
     "seen": 1788981098.6507387,
     "ast_hash": "e48bb794ad9ccb51e3dd5c06292c7844",
+    "semantic_hash": ""
+  },
+  "scripts/get_data.py": {
+    "mtime": 1789037175.2770398,
+    "seen": 1789037366.3616412,
+    "ast_hash": "ca950423474b68be8c70348fb5409143",
+    "semantic_hash": ""
+  },
+  "src/ddera/data/acquire.py": {
+    "mtime": 1789037157.1110973,
+    "seen": 1789037366.3616502,
+    "ast_hash": "3002b26f1a610e5c820160a4291c7471",
+    "semantic_hash": ""
+  },
+  "tests/test_acquire.py": {
+    "mtime": 1789037278.7732286,
+    "seen": 1789037366.3616738,
+    "ast_hash": "9afd9e610a21e08dc81b142293226c35",
     "semantic_hash": ""
   }
 }

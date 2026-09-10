@@ -20,6 +20,9 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_ROOT = REPO_ROOT / "configs"
 DATA_ROOT = REPO_ROOT / "data"
+#: Derived data-pipeline artifacts (manifest.parquet, splits.parquet, ...). Gitignored via
+#: ``/data/``. Kept separate from the raw download so ``data/chexpert/`` stays untouched.
+PROCESSED_DATA_ROOT = DATA_ROOT / "processed"
 EXPERIMENT_ROOT = REPO_ROOT / "experiments"
 RUNS_ROOT = EXPERIMENT_ROOT / "runs"
 

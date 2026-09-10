@@ -1,16 +1,16 @@
 # Graph Report - DDERA  (2026-09-10)
 
 ## Corpus Check
-- 53 files · ~288,774 words
+- 56 files · ~292,032 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 930 nodes · 1484 edges · 58 communities (40 shown, 10 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 51 edges (avg confidence: 0.88)
+- 999 nodes · 1674 edges · 63 communities (45 shown, 10 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 58 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `6d77801c`
+- Built from commit: `b9841754`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,11 +19,11 @@
 - patient_level_split
 - manifest_from_frame
 - apply_uncertainty_policy
-- .from_yaml
+- ConceptSpec
 - TestCalibration
 - verify_gpu.py
 - TestCompleteness
-- test_xai_harness.py
+- GradCAM
 - Step 4: Concept Bottleneck Layer
 - make_synthetic_cbm
 - Final Flow Diagram: CNN-based Concept Bottleneck Model for Ante-hoc Explainable Chest X-ray Diagnosis
@@ -34,23 +34,23 @@
 - intervention.py
 - get_device_info
 - 10. Concept Intervention (What-If Analysis)
-- soft_vs_hard_leakage
+- test_xai_harness.py
 - What You Must Do When Invoked
 - intervention_order
 - Phase 8: VinDr-CXR generalization study
 - verify_decomposition
 - Phase 3: Milestone M1 professor demo
 - The eight-family evaluation protocol
-- Concept vector bottleneck c in [0,1]^12
+- Interpretable linear reasoner p=sigma(w.c+b)
 - CheXpert v1 concept specification file
 - LinearReasoner
 - test_cbm_math.py
 - DDERA (Data-Driven Explainable Radiological Analytics)
-- ADR-009: Local GPU (RX 6800M / gfx1031) via ROCm on native Linux
+- acquire.py
 - graphify reference: extra exports and benchmark
 - graphify reference: query, path, explain
 - DDERA tech stack
-- Interpretable linear reasoner p=sigma(w.c+b)
+- Module: reporting/runs.py
 - graphify reference: add a URL and watch a folder
 - Invariant 10: simplifications require a documented effect on the research question
 - ddera/__init__.py
@@ -65,18 +65,23 @@
 - graphify reference: transcribe video and audio
 - CLAUDE.md
 - extraction-spec.md
+- build_processed_dataset
+- test_acquire.py
+- _binarize_target
+- labels.py
+- inspect_download
 
 ## God Nodes (most connected - your core abstractions)
-1. `patient_level_split()` - 26 edges
-2. `LinearReasoner` - 23 edges
-3. `manifest_from_frame()` - 21 edges
-4. `apply_uncertainty_policy()` - 19 edges
-5. `safe_auroc()` - 19 edges
-6. `soft_vs_hard_leakage()` - 15 edges
-7. `intervention_order()` - 14 edges
-8. `tti_curve()` - 14 edges
-9. `concept_permutation_necessity()` - 14 edges
-10. `stability_report()` - 14 edges
+1. `patient_level_split()` - 28 edges
+2. `build_processed_dataset()` - 25 edges
+3. `LinearReasoner` - 23 edges
+4. `manifest_from_frame()` - 21 edges
+5. `apply_uncertainty_policy()` - 21 edges
+6. `safe_auroc()` - 19 edges
+7. `ConceptSpec` - 17 edges
+8. `_write_synthetic_chexpert()` - 17 edges
+9. `soft_vs_hard_leakage()` - 15 edges
+10. `intervention_order()` - 14 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Linear logit decomposition logit(p)=b+sum(wj*cj)` --semantically_similar_to--> `Interpretable linear reasoner p=sigma(w.c+b)`  [INFERRED] [semantically similar]
@@ -109,7 +114,7 @@
 - **Two-Stage Training Strategy** — docs_images_end_to_end_flow_training_strategy, docs_images_end_to_end_flow_concept_predictor_stage, docs_images_end_to_end_flow_concept_to_disease_stage [INFERRED 0.85]
 - **Concept Bottleneck Model Core Pipeline** — docs_images_flow_diagram_concept_prediction_layer, docs_images_flow_diagram_concept_representations, docs_images_flow_diagram_interpretable_classifier, docs_images_flow_diagram_disease_prediction, docs_images_flow_diagram_ante_hoc_explanation, docs_images_flow_diagram_concept_intervention [INFERRED 0.85]
 
-## Communities (58 total, 10 thin omitted)
+## Communities (63 total, 10 thin omitted)
 
 ### Community 0 - "safe_auroc"
 Cohesion: 0.05
@@ -117,17 +122,17 @@ Nodes (37): MetricFn, bootstrap_ci(), BootstrapResult, is_significant(), paired_
 
 ### Community 1 - "patient_level_split"
 Cohesion: 0.06
-Nodes (31): Policy: notebook outputs deliberately kept (no nbstripout), Module: data/splits.py, Repository conventions (configs, seeding, splits, naming, plots, paths), Cohort definition: frontal views, patient-level split, ADR-005: Patient-level splits, frontal views only, ADR-011: Split prevalence checked via z-score, not fixed tolerance, assert_no_patient_leakage(), check_split_integrity() (+23 more)
+Nodes (34): Policy: notebook outputs deliberately kept (no nbstripout), Module: data/splits.py, Repository conventions (configs, seeding, splits, naming, plots, paths), Cohort definition: frontal views, patient-level split, ADR-005: Patient-level splits, frontal views only, ADR-011: Split prevalence checked via z-score, not fixed tolerance, assert_no_patient_leakage(), check_split_integrity() (+26 more)
 
 ### Community 2 - "manifest_from_frame"
-Cohesion: 0.06
-Nodes (30): parametrize, build_manifest(), concept_matrix(), cooccurrence_matrix(), manifest_from_frame(), ManifestSummary, parse_chexpert_path(), Any (+22 more)
+Cohesion: 0.09
+Nodes (17): parametrize, concept_matrix(), cooccurrence_matrix(), manifest_from_frame(), parse_chexpert_path(), ndarray, Manifest construction from an already-loaded frame. Split out from…, Extract the ``(n, k)`` raw concept matrix (values still 1/0/-1/NaN). (+9 more)
 
 ### Community 3 - "apply_uncertainty_policy"
 Cohesion: 0.07
-Nodes (29): BlankPolicy, bool_, ConceptPolicy, apply_uncertainty_policy(), encode_concept_matrix(), label_distribution(), mask_coverage(), ArrayLike (+21 more)
+Nodes (26): BlankPolicy, bool_, ConceptPolicy, apply_uncertainty_policy(), encode_concept_matrix(), label_distribution(), mask_coverage(), ArrayLike (+18 more)
 
-### Community 4 - ".from_yaml"
+### Community 4 - "ConceptSpec"
 Cohesion: 0.07
 Nodes (22): CohortSpec, ConceptSpec, EscalationSpec, load_yaml(), Any, Path, Configuration loading. Every experiment is fully described by YAML. Nothing is…, Load a YAML file, resolving bare names against ``configs/``. (+14 more)
 
@@ -136,16 +141,16 @@ Cohesion: 0.08
 Nodes (30): BinStrategy, apply_temperature(), _bin_edges(), brier_score(), calibration_report(), expected_calibration_error(), fit_temperature(), maximum_calibration_error() (+22 more)
 
 ### Community 6 - "verify_gpu.py"
-Cohesion: 0.13
-Nodes (30): check_1_device(), check_2_matmul(), check_3_conv2d(), check_4_densenet_amp(), check_5_bce(), check_6_overfit(), check_7_soak(), check_8_vram() (+22 more)
+Cohesion: 0.08
+Nodes (42): GPU/backend environment workflow (4.1, 4.4), Invariant 7: compute limitations must never justify a black-box swap, Invariant 8: GPU strategy may change, methodology must not, ADR-009: Local GPU (RX 6800M / gfx1031) via ROCm on native Linux, HSA_OVERRIDE_GFX_VERSION=10.3.0 gfx1031->gfx1030 mechanism, Ubuntu dual-boot + ROCm setup procedure, Part 7 verification gate (scripts/verify_gpu.py), Phase 0: Foundation and GPU bring-up (+34 more)
 
 ### Community 7 - "TestCompleteness"
 Cohesion: 0.08
 Nodes (20): completeness_curve(), completeness_ratio(), completeness_report(), CompletenessCurve, _describe(), Any, Concept completeness. How much of the task-relevant information does the…, Build a curve from a ``{residual_width: auroc}`` mapping (as produced by the… (+12 more)
 
-### Community 8 - "test_xai_harness.py"
-Cohesion: 0.09
-Nodes (22): assert_baseline_only(), comparison_table(), GradCAM, lime_explanation(), Any, ArrayLike, float64, NDArray (+14 more)
+### Community 8 - "GradCAM"
+Cohesion: 0.10
+Nodes (19): assert_baseline_only(), comparison_table(), GradCAM, lime_explanation(), Any, ArrayLike, float64, NDArray (+11 more)
 
 ### Community 9 - "Step 4: Concept Bottleneck Layer"
 Cohesion: 0.09
@@ -187,9 +192,9 @@ Nodes (13): Backend, DeviceInfo, get_device(), get_device_info(), _probe_amp(), 
 Cohesion: 0.16
 Nodes (16): 9. Ante-hoc Explanation, CheXpert Dataset, 4. CNN / Vision Encoder, 10. Concept Intervention (What-If Analysis), 5. Concept Prediction Layer, 6. Concept Representations, 1. Data Acquisition, 2. Data Cleaning & EDA (+8 more)
 
-### Community 19 - "soft_vs_hard_leakage"
+### Community 19 - "test_xai_harness.py"
 Cohesion: 0.06
-Nodes (33): concept_permutation_necessity(), _describe_incompleteness(), _describe_leakage(), leakage_report(), Any, ArrayLike, float64, NDArray (+25 more)
+Nodes (36): concept_permutation_necessity(), _describe_incompleteness(), _describe_leakage(), leakage_report(), Any, ArrayLike, float64, NDArray (+28 more)
 
 ### Community 20 - "What You Must Do When Invoked"
 Cohesion: 0.08
@@ -200,28 +205,28 @@ Cohesion: 0.26
 Nodes (6): int_, apply_intervention_order(), intervention_order(), Build an ``(n, k)`` matrix giving, per sample, the order to intervene on…, Replace the first ``n_intervened`` concepts (per sample, per ``order``) with…, TestInterventionOrdering
 
 ### Community 22 - "Phase 8: VinDr-CXR generalization study"
-Cohesion: 0.20
-Nodes (12): Why xai/ takes no domain arguments, Invariant 1: DDERA is a methodology project, not merely a classifier, Invariant 2: Chest X-ray is the first validation case study, Invariant 9: domain generality claims require a second dataset, Medical/ethical rules, ADR-002: CheXpert first case study, VinDr-CXR generalization study, Phase 8: VinDr-CXR generalization study, Phase 9: Dashboard and deployment (+4 more)
+Cohesion: 0.25
+Nodes (8): Why xai/ takes no domain arguments, Module: xai/posthoc.py (B0 baselines only), Invariant 1: DDERA is a methodology project, not merely a classifier, Invariant 2: Chest X-ray is the first validation case study, Invariant 5: post-hoc methods are comparison baselines only, Phase 7: Post-hoc baselines, Phase 8: VinDr-CXR generalization study, Phase 9: Dashboard and deployment
 
 ### Community 23 - "verify_decomposition"
 Cohesion: 0.20
 Nodes (7): Assert that contributions plus bias reproduce the logit exactly. Returns the…, verify_decomposition(), logit(p) == bias + sum_j w_j c_j, exactly., All-zeros and all-ones are the boundary cases the dashboard sliders can reach., With every concept at zero the logit must be exactly the bias., The guard must actually fire -- a test that can never fail is worthless., TestDecomposition
 
 ### Community 24 - "Phase 3: Milestone M1 professor demo"
-Cohesion: 0.15
-Nodes (15): B0: black-box DenseNet-121 baseline, Two execution profiles: training vs analysis/demo, Feature-cache invalidation via encoder fingerprint, M1: independent CBM (ground-truth concepts), M2: sequential CBM (predicted concepts, practical default), M3: joint CBM, lambda sweep -> trade-off curve, M4: hybrid/residual CBM, k sweep -> completeness curve, Module: features/cache.py (+7 more)
+Cohesion: 0.14
+Nodes (15): B0: black-box DenseNet-121 baseline, Two execution profiles: training vs analysis/demo, Feature-cache invalidation via encoder fingerprint, M1: independent CBM (ground-truth concepts), M2: sequential CBM (predicted concepts, practical default), M3: joint CBM, lambda sweep -> trade-off curve, M5: uncertainty-aware CBM, Module: features/cache.py (+7 more)
 
 ### Community 25 - "The eight-family evaluation protocol"
-Cohesion: 0.33
-Nodes (6): The eight-family evaluation protocol, Module: xai/stability.py, Definition of done for a run, Invariant 6: accuracy must be evaluated alongside interpretability metrics, Eight-family evaluation protocol, Reusable domain-agnostic methodology contribution
+Cohesion: 0.20
+Nodes (10): The eight-family evaluation protocol, M4: hybrid/residual CBM, k sweep -> completeness curve, Module: models/cbm.py, Module: xai/completeness.py, Module: xai/stability.py, Definition of done for a run, Invariant 6: accuracy must be evaluated alongside interpretability metrics, ADR-012: Leakage and incompleteness measured as separate quantities (+2 more)
 
-### Community 26 - "Concept vector bottleneck c in [0,1]^12"
-Cohesion: 0.33
-Nodes (6): Concept head: Linear(1024->12)+sigma, Concept vector bottleneck c in [0,1]^12, DenseNet-121 vision encoder stage, Module: models/encoder.py, Invariant 3: Explanations must be intrinsic/ante-hoc, ADR-006: No horizontal flip in augmentation
+### Community 26 - "Interpretable linear reasoner p=sigma(w.c+b)"
+Cohesion: 0.18
+Nodes (11): Concept head: Linear(1024->12)+sigma, Concept intervention experiment, Concept vector bottleneck c in [0,1]^12, DenseNet-121 vision encoder stage, Interpretable linear reasoner p=sigma(w.c+b), Module: models/encoder.py, Module: models/reasoner.py, Module: xai/intervention.py (+3 more)
 
 ### Community 27 - "CheXpert v1 concept specification file"
-Cohesion: 0.19
-Nodes (14): Module: xai/leakage.py, The 12 concept list (chexpert_v1), Pre-committed escalation rule to leave-one-out sweep, Expected leakage watchlist (Consolidation, Lung Opacity), CheXpert v1 concept specification file, Target definition: Pneumonia, Uncertainty policy: U-Mask concepts, U-Ignore target, ADR-003: Target=Pneumonia, concepts=12 radiographic observations (+6 more)
+Cohesion: 0.21
+Nodes (12): Module: xai/leakage.py, The 12 concept list (chexpert_v1), Pre-committed escalation rule to leave-one-out sweep, Expected leakage watchlist (Consolidation, Lung Opacity), CheXpert v1 concept specification file, Target definition: Pneumonia, Uncertainty policy: U-Mask concepts, U-Ignore target, ADR-003: Target=Pneumonia, concepts=12 radiographic observations (+4 more)
 
 ### Community 28 - "LinearReasoner"
 Cohesion: 0.20
@@ -232,12 +237,12 @@ Cohesion: 0.18
 Nodes (6): The CBM mathematics. These are the correctness-critical tests in the project.…, Does the model behave the way its weights claim?, For a linear reasoner, d logit / d c_j must equal w_j., A linear reasoner has the same derivative everywhere; that is why it is…, Concepts pinned at 0 or 1 must still yield the correct one-sided estimate., TestFaithfulness
 
 ### Community 30 - "DDERA (Data-Driven Explainable Radiological Analytics)"
-Cohesion: 0.31
-Nodes (10): The core ante-hoc prediction pathway, ProtoPNet: optional second ante-hoc family, Honesty rules for results, ADR-001: Concept Bottleneck Model as primary architecture, Ante-hoc vs post-hoc explanation inversion, Core research question, DDERA (Data-Driven Explainable Radiological Analytics), Linear logit decomposition logit(p)=b+sum(wj*cj) (+2 more)
+Cohesion: 0.18
+Nodes (16): The core ante-hoc prediction pathway, ProtoPNet: optional second ante-hoc family, Honesty rules for results, Invariant 9: domain generality claims require a second dataset, Medical/ethical rules, ADR-001: Concept Bottleneck Model as primary architecture, ADR-002: CheXpert first case study, VinDr-CXR generalization study, CheXpert dataset (+8 more)
 
-### Community 31 - "ADR-009: Local GPU (RX 6800M / gfx1031) via ROCm on native Linux"
-Cohesion: 0.22
-Nodes (11): GPU/backend environment workflow (4.1, 4.4), Invariant 7: compute limitations must never justify a black-box swap, Invariant 8: GPU strategy may change, methodology must not, ADR-009: Local GPU (RX 6800M / gfx1031) via ROCm on native Linux, HSA_OVERRIDE_GFX_VERSION=10.3.0 gfx1031->gfx1030 mechanism, Ubuntu dual-boot + ROCm setup procedure, Part 7 verification gate (scripts/verify_gpu.py), Phase 0: Foundation and GPU bring-up (+3 more)
+### Community 31 - "acquire.py"
+Cohesion: 0.12
+Nodes (20): ProcessedArtifacts, Phase-1 data acquisition orchestration (ADR-002/003/004/005/011). Ties the…, Everything :func:`build_processed_dataset` produced, for the CLI and the EDA…, build_manifest(), ImageProbeReport, load_manifest(), ManifestSummary, probe_image_dimensions() (+12 more)
 
 ### Community 32 - "graphify reference: extra exports and benchmark"
 Cohesion: 0.22
@@ -251,9 +256,9 @@ Nodes (5): For /graphify explain, For /graphify path, graphify reference: query,
 Cohesion: 0.40
 Nodes (6): pre-commit hook: ruff (--fix), Notebooks are narrative, src/ddera is the library, DDERA tech stack, ADR-007: Python 3.11 (Windows) / 3.12 (Linux training box), Backend-agnostic core dependencies, Dev/quality dependencies (pytest, ruff, black, pre-commit)
 
-### Community 35 - "Interpretable linear reasoner p=sigma(w.c+b)"
-Cohesion: 0.14
-Nodes (16): Streamlit application architecture, Concept intervention experiment, Data flow and run artifacts pipeline, Explainability Lab (live concept intervention page), Interpretable linear reasoner p=sigma(w.c+b), M5: uncertainty-aware CBM, Module: models/reasoner.py, Module: reporting/runs.py (+8 more)
+### Community 35 - "Module: reporting/runs.py"
+Cohesion: 0.50
+Nodes (5): Streamlit application architecture, Data flow and run artifacts pipeline, Explainability Lab (live concept intervention page), Module: reporting/runs.py, ADR-010: Local JSON run artifacts instead of MLflow/W&B
 
 ### Community 36 - "graphify reference: add a URL and watch a folder"
 Cohesion: 0.50
@@ -271,25 +276,45 @@ Nodes (3): For git commit hook, For native CLAUDE.md integration, graphify refer
 Cohesion: 0.50
 Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
 
+### Community 58 - "build_processed_dataset"
+Cohesion: 0.24
+Nodes (10): build_processed_dataset(), Run the Phase-1 pipeline end to end and write the artifacts. Args: dest: an…, load_splits(), Read a split table written by :func:`write_splits`, returning ``(df,…, Path, Write a miniature CheXpert-v1.0-small tree (train.csv, valid.csv, optional…, _spec(), TestBuildProcessedDataset (+2 more)
+
+### Community 59 - "test_acquire.py"
+Cohesion: 0.25
+Nodes (6): ArgumentParser, build_arg_parser(), main(), Phase-1 CheXpert acquisition. Verify a *local* CheXpert download, build the…, Phase-1 acquisition pipeline: local-download inspection, manifest/splits…, TestCLI
+
+### Community 60 - "_binarize_target"
+Cohesion: 0.20
+Nodes (5): _binarize_target(), CheXpertLayout, Any, Apply ADR-004's target policy: drop uncertain-target rows, then map to 0/1., What :func:`inspect_download` found under a candidate CheXpert directory.
+
+### Community 61 - "labels.py"
+Cohesion: 0.20
+Nodes (8): Label encoding and uncertainty policies (ADR-004). CheXpert-style label…, Guard against a policy bug silently leaving -1 or NaN in the label array., _validate_binary(), DataFrame, fixture, CheXpert manifest construction. Path parsing is strict on purpose: a mis-parsed…, A miniature CheXpert CSV covering positive/negative/uncertain/blank and both…, raw_csv()
+
+### Community 62 - "inspect_download"
+Cohesion: 0.36
+Nodes (5): _first_existing(), inspect_download(), Path, Locate ``train.csv`` / ``valid.csv`` and the image tree under ``dest``. Accepts…, TestInspectDownload
+
 ## Knowledge Gaps
 - **86 isolated node(s):** `ddera`, `graphify`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)` (+81 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 342 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 362 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ADR-012: Leakage and incompleteness measured as separate quantities` connect `Phase 3: Milestone M1 professor demo` to `test_xai_harness.py`, `CheXpert v1 concept specification file`?**
-  _High betweenness centrality (0.155) - this node is a cross-community bridge._
-- **Why does `Module: xai/leakage.py` connect `CheXpert v1 concept specification file` to `Phase 3: Milestone M1 professor demo`, `The eight-family evaluation protocol`?**
-  _High betweenness centrality (0.110) - this node is a cross-community bridge._
-- **Why does `DDERA (Data-Driven Explainable Radiological Analytics)` connect `DDERA (Data-Driven Explainable Radiological Analytics)` to `patient_level_split`, `Phase 8: VinDr-CXR generalization study`, `The eight-family evaluation protocol`, `CheXpert v1 concept specification file`, `ADR-009: Local GPU (RX 6800M / gfx1031) via ROCm on native Linux`?**
-  _High betweenness centrality (0.095) - this node is a cross-community bridge._
+- **Why does `safe_auroc()` connect `safe_auroc` to `intervention.py`, `test_xai_harness.py`, `tti_curve`?**
+  _High betweenness centrality (0.056) - this node is a cross-community bridge._
+- **Why does `DDERA (Data-Driven Explainable Radiological Analytics)` connect `DDERA (Data-Driven Explainable Radiological Analytics)` to `patient_level_split`, `verify_gpu.py`, `test_acquire.py`, `The eight-family evaluation protocol`, `CheXpert v1 concept specification file`?**
+  _High betweenness centrality (0.054) - this node is a cross-community bridge._
+- **Why does `ADR-012: Leakage and incompleteness measured as separate quantities` connect `The eight-family evaluation protocol` to `test_xai_harness.py`, `CheXpert v1 concept specification file`?**
+  _High betweenness centrality (0.053) - this node is a cross-community bridge._
 - **Are the 7 inferred relationships involving `LinearReasoner` (e.g. with `reasoner()` and `TestDecomposition`) actually correct?**
   _`LinearReasoner` has 7 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 7 inferred relationships involving `safe_auroc()` (e.g. with `.test_interval_contains_the_point_estimate()` and `.test_is_deterministic_given_a_seed()`) actually correct?**
-  _`safe_auroc()` has 7 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `ddera`, `graphify`, `Usage` to the rest of the system?**
   _86 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `safe_auroc` be split into smaller, more focused modules?**
   _Cohesion score 0.05174825174825175 - nodes in this community are weakly interconnected._
+- **Should `patient_level_split` be split into smaller, more focused modules?**
+  _Cohesion score 0.05536723163841808 - nodes in this community are weakly interconnected._

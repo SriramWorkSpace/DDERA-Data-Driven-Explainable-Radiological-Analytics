@@ -16,7 +16,9 @@ across splits without ever letting a patient straddle two of them.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -236,6 +238,49 @@ def check_split_integrity(
 
     result["ok"] = result["leakage_free"] and not result["issues"]
     return result
+
+
+def write_splits(
+    split_df: pd.DataFrame,
+    path: str | Path,
+    *,
+    report: SplitReport | None = None,
+    integrity: dict[str, Any] | None = None,
+    split_col: str = "split",
+) -> Path:
+    """Write ``splits.parquet`` (the manifest plus its ``split`` column) and a JSON sidecar
+    holding the :class:`SplitReport` and the :func:`check_split_integrity` result.
+    """
+    path = Path(path)
+    if split_col not in split_df.columns:
+        raise ValueError(f"Expected a {split_col!r} column; got {list(split_df.columns)}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    split_df.to_parquet(path, index=False)
+
+    sidecar: dict[str, Any] = {"n_rows": int(len(split_df))}
+    if report is not None:
+        sidecar["split_report"] = report.to_dict()
+    if integrity is not None:
+        sidecar["integrity"] = integrity
+    path.with_suffix(".json").write_text(
+        json.dumps(sidecar, indent=2, default=str), encoding="utf-8"
+    )
+    return path
+
+
+def load_splits(path: str | Path) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Read a split table written by :func:`write_splits`, returning ``(df, sidecar)``.
+
+    The sidecar is optional on read (an empty dict if absent) -- unlike the manifest
+    sidecar, it carries only diagnostics, not a contract the data cannot be used without.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Splits parquet not found: {path}")
+    df = pd.read_parquet(path)
+    sidecar_path = path.with_suffix(".json")
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8")) if sidecar_path.exists() else {}
+    return df, sidecar
 
 
 def _validate_ratios(ratios: dict[str, float]) -> None:

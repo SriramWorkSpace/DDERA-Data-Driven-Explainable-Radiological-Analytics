@@ -17,6 +17,7 @@ rather than falling back to something plausible.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +25,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from PIL import Image
 
 from ddera.data.labels import CHEXPERT_OBSERVATIONS
 
@@ -228,3 +230,152 @@ def cooccurrence_matrix(manifest: pd.DataFrame, observations: list[str]) -> pd.D
     positives = (manifest[columns] == 1.0).astype(int).to_numpy()
     counts = positives.T @ positives
     return pd.DataFrame(counts, index=observations, columns=observations)
+
+
+# ---------------------------------------------------------------------------------------
+# Image probing
+# ---------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ImageProbeReport:
+    """Result of checking that each manifest row points at a readable image."""
+
+    n_checked: int
+    n_missing: int
+    n_unreadable: int
+    dimensions_available: bool
+    missing_paths: list[str]
+    unreadable_paths: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        # Cap the path lists so a wholly-broken download does not write a 200k-line sidecar.
+        return {
+            "n_checked": self.n_checked,
+            "n_missing": self.n_missing,
+            "n_unreadable": self.n_unreadable,
+            "dimensions_available": self.dimensions_available,
+            "missing_paths": self.missing_paths[:50],
+            "unreadable_paths": self.unreadable_paths[:50],
+        }
+
+    def summary(self) -> str:
+        return (
+            f"image probe: {self.n_checked:,} checked, {self.n_missing:,} missing, "
+            f"{self.n_unreadable:,} unreadable"
+        )
+
+
+def probe_image_dimensions(
+    manifest: pd.DataFrame,
+    image_root: str | Path | None,
+    *,
+    path_column: str = "path",
+) -> tuple[pd.DataFrame, ImageProbeReport]:
+    """Resolve each row's image against ``image_root``, record ``width``/``height``, and
+    flag files that are missing or cannot be decoded.
+
+    ``image_root`` is the directory the CheXpert ``Path`` values are relative to (the parent
+    of ``CheXpert-v1.0-small/``). When it is ``None`` the probe is skipped and the manifest
+    is returned unchanged with ``dimensions_available=False`` -- the path a CSV-only
+    checkout and the tests take.
+
+    Only the image header is parsed (plus a structural ``verify()``); pixels are never
+    decoded, so this stays cheap over the full dataset.
+    """
+    out = manifest.copy()
+    if image_root is None:
+        return out, ImageProbeReport(0, 0, 0, False, [], [])
+
+    root = Path(image_root)
+    widths: list[int | None] = []
+    heights: list[int | None] = []
+    missing: list[str] = []
+    unreadable: list[str] = []
+
+    for rel in out[path_column].astype(str):
+        fpath = root / rel
+        if not fpath.is_file():
+            missing.append(rel)
+            widths.append(None)
+            heights.append(None)
+            continue
+        try:
+            with Image.open(fpath) as im:
+                im.verify()
+            with Image.open(fpath) as im:
+                width, height = im.size
+        except Exception:  # noqa: BLE001 - any decode failure means the file is unusable
+            unreadable.append(rel)
+            widths.append(None)
+            heights.append(None)
+            continue
+        widths.append(int(width))
+        heights.append(int(height))
+
+    out["width"] = pd.array(widths, dtype="Int64")
+    out["height"] = pd.array(heights, dtype="Int64")
+    return out, ImageProbeReport(
+        n_checked=len(out),
+        n_missing=len(missing),
+        n_unreadable=len(unreadable),
+        dimensions_available=True,
+        missing_paths=missing,
+        unreadable_paths=unreadable,
+    )
+
+
+# ---------------------------------------------------------------------------------------
+# Persistence
+# ---------------------------------------------------------------------------------------
+
+
+def write_manifest(
+    manifest: pd.DataFrame,
+    path: str | Path,
+    *,
+    meta: dict[str, Any] | None = None,
+) -> Path:
+    """Write ``manifest.parquet`` plus a JSON sidecar.
+
+    The sidecar carries the target/concept contract (``manifest.attrs`` is *not* preserved
+    by parquet) and any extra ``meta`` -- summaries, provenance, image report.
+    :func:`load_manifest` restores the contract from it.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    manifest.to_parquet(path, index=False)
+
+    sidecar: dict[str, Any] = {
+        "target": manifest.attrs.get("target"),
+        "concepts": list(manifest.attrs.get("concepts", [])),
+        "n_rows": int(len(manifest)),
+        "columns": list(manifest.columns),
+    }
+    if meta:
+        sidecar.update(meta)
+    path.with_suffix(".json").write_text(
+        json.dumps(sidecar, indent=2, default=str), encoding="utf-8"
+    )
+    return path
+
+
+def load_manifest(path: str | Path) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Read a manifest written by :func:`write_manifest`, restoring ``attrs['target']`` and
+    ``attrs['concepts']`` from the sidecar. Raises if the sidecar is absent -- the manifest
+    is unusable without the concept/target contract.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Manifest parquet not found: {path}")
+    sidecar_path = path.with_suffix(".json")
+    if not sidecar_path.exists():
+        raise FileNotFoundError(
+            f"Manifest sidecar not found: {sidecar_path}. It carries the target/concept "
+            "contract that parquet cannot store; the manifest is unusable without it."
+        )
+    manifest = pd.read_parquet(path)
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    manifest.attrs["target"] = sidecar.get("target")
+    manifest.attrs["concepts"] = list(sidecar.get("concepts", []))
+    return manifest, sidecar
