@@ -57,9 +57,15 @@ supported combinations first; any step down must be justified by an observed, re
 - [ ] Push (**needs explicit go-ahead**)
 
 ### 0.4 Long-lead items — start now, used much later
-- [ ] Register for CheXpert (Stanford AIMI research-use agreement)
+
+Step-by-step: [`docs/DATA-ACQUISITION.md`](docs/DATA-ACQUISITION.md). All Phase 1–5 machinery
+is built and synthetic-tested; the real numbers are blocked only on the CheXpert download.
+
+- [~] Register for CheXpert (Stanford AIMI research-use agreement) — **in progress**
 - [ ] **Start PhysioNet CITI credentialing for VinDr-CXR** — takes days to weeks; Phase 8 is blocked
       on it, so it must be requested in Phase 0
+- [ ] `scripts/extract_features.py` — the one code gap between "data downloaded" and
+      "training runnable" (Phase 2 execution); ~30 lines over `FeatureCache.extract`
 
 ---
 
