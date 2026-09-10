@@ -198,8 +198,10 @@ manifest.parquet          patient_id · study · view · path · 14 labels · h 
 splits.parquet            + split ∈ {train, val, test}   (patient-disjoint — enforced by tests)
       │  ddera/data/splits.py
       ▼
-features/{split}.npy      float16 memmap, N × 1024   +   index.parquet   +   fingerprint.json
-      │  ddera/features/cache.py            (valid only while the encoder is frozen)
+data/features/{split}.npy   float16 memmap, N × 1024  +  {split}_index.parquet  +  fingerprint.json
+      │  ddera/features/cache.py            (valid only while the encoder is frozen; kept
+      │                                      under data/ so it never enters git)
+      ▼
       ▼
 experiments/runs/<run_id>/
       ├── config.yaml            fully resolved — reproduces the run exactly

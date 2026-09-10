@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
-from ddera.config import ConceptSpec
+from ddera.config import ConceptSpec, EncoderConfig
 from ddera.data.chexpert import concept_matrix, cooccurrence_matrix
 from ddera.data.labels import encode_concept_matrix, label_distribution, mask_coverage
 from ddera.reporting.theme import ACCENT, LABEL_COLORS, SPLIT_COLORS
@@ -144,5 +145,140 @@ def plot_mask_coverage(manifest: pd.DataFrame, spec: ConceptSpec) -> plt.Figure:
         f"Concept label coverage - policy '{spec.uncertainty.concept_policy}' "
         f"(overall {coverage['overall']:.2f})"
     )
+    fig.tight_layout()
+    return fig
+
+
+# ---------------------------------------------------------------------------------------
+# Phase 2 / preprocessing + feature views
+# ---------------------------------------------------------------------------------------
+
+
+def _denormalise(tensor: npt.ArrayLike, encoder: EncoderConfig) -> np.ndarray:
+    """CHW normalised tensor -> HWC float image in [0, 1] for display."""
+    arr = np.asarray(tensor, dtype=np.float32)
+    mean = np.asarray(encoder.normalization_mean, dtype=np.float32)[:, None, None]
+    std = np.asarray(encoder.normalization_std, dtype=np.float32)[:, None, None]
+    return np.clip(arr * std + mean, 0.0, 1.0).transpose(1, 2, 0)
+
+
+def plot_augmentation_grid(
+    image_rgb_uint8: np.ndarray, train_transform, *, n: int = 8, seed: int = 0
+) -> plt.Figure:
+    """``n`` draws of the training augmentation on one image -- shows the jitter is small
+    and (ADR-006) never a reflection.
+    """
+    enc = EncoderConfig()
+    cols = min(n, 4)
+    rows = int(np.ceil(n / cols))
+    fig, axes = plt.subplots(rows, cols, figsize=(2.4 * cols, 2.4 * rows))
+    for k, ax in enumerate(np.atleast_1d(axes).ravel()):
+        ax.axis("off")
+        if k >= n:
+            continue
+        np.random.seed(seed + k)  # noqa: NPY002 - albumentations uses the legacy global RNG
+        out = train_transform(image=image_rgb_uint8)["image"]
+        ax.imshow(_denormalise(out, enc))
+        ax.set_title(f"draw {k + 1}", fontsize=8)
+    fig.suptitle("Training augmentation draws (ADR-006: no reflection)", fontweight="bold")
+    fig.tight_layout()
+    return fig
+
+
+def plot_preprocessed_samples(
+    dataset, *, n: int = 8, encoder: EncoderConfig | None = None
+) -> plt.Figure:
+    """A grid of post-transform images from a :class:`CheXpertImageDataset`, with their
+    concept counts -- a quick "does the pipeline produce sane tensors" view.
+    """
+    enc = encoder or EncoderConfig()
+    n = min(n, len(dataset))
+    cols = min(n, 4)
+    rows = int(np.ceil(n / cols))
+    fig, axes = plt.subplots(rows, cols, figsize=(2.4 * cols, 2.7 * rows))
+    for k, ax in enumerate(np.atleast_1d(axes).ravel()):
+        ax.axis("off")
+        if k >= n:
+            continue
+        item = dataset[k]
+        ax.imshow(_denormalise(item["image"], enc))
+        n_pos = int((item["concepts"].numpy() * item["concept_mask"].numpy()).sum())
+        ax.set_title(f"y={int(item['target'].item())}  concepts+={n_pos}", fontsize=8)
+    fig.suptitle("Preprocessed samples", fontweight="bold")
+    fig.tight_layout()
+    return fig
+
+
+def plot_feature_space(
+    features: npt.ArrayLike,
+    colour_values: npt.ArrayLike,
+    *,
+    title: str = "Encoder feature space (PCA)",
+    colour_label: str = "target",
+) -> plt.Figure:
+    """2-D PCA scatter of cached features, coloured by a label vector. A sanity view of the
+    representation, not a result -- clusters here are not evidence of anything on their own.
+    """
+    import warnings
+
+    from sklearn.decomposition import PCA
+
+    x = np.asarray(features, dtype=np.float64)
+    with warnings.catch_warnings():
+        # A near-degenerate feature matrix (e.g. an untrained encoder on tiny demo images)
+        # makes PCA's explained-variance ratio divide by ~0. Harmless for a layout view.
+        warnings.simplefilter("ignore", RuntimeWarning)
+        coords = PCA(n_components=2, random_state=0).fit_transform(x)
+    fig, ax = plt.subplots(figsize=(5.4, 4.6))
+    scatter = ax.scatter(
+        coords[:, 0], coords[:, 1], c=np.asarray(colour_values), cmap="coolwarm", s=12, alpha=0.8
+    )
+    ax.set_xlabel("PC 1")
+    ax.set_ylabel("PC 2")
+    ax.set_title(title)
+    fig.colorbar(scatter, ax=ax, label=colour_label, fraction=0.046, pad=0.04)
+    fig.tight_layout()
+    return fig
+
+
+def plot_concept_probe_auroc(probe_result: dict) -> plt.Figure:
+    """Per-concept linear-probe AUROC (GATE 2 sanity check). 0.5 = chance."""
+    per = probe_result["per_concept"]
+    names = list(per)
+    aurocs = [per[n]["auroc"] for n in names]
+    order = np.argsort([a if a == a else -1 for a in aurocs])
+    names = [names[i] for i in order]
+    aurocs = [aurocs[i] for i in order]
+
+    fig, ax = plt.subplots(figsize=(9, 0.4 * len(names) + 1.6))
+    ax.barh(names, [0.0 if a != a else a for a in aurocs], color=ACCENT)
+    ax.axvline(0.5, ls="--", color="#334155", label="chance")
+    ax.set_xlim(0.0, 1.0)
+    ax.set_xlabel("probe AUROC")
+    macro = probe_result.get("macro_auroc", float("nan"))
+    ax.set_title(f"Linear concept probe - macro AUROC {macro:.3f}")
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    return fig
+
+
+def plot_feature_cache_sanity(
+    cached: npt.ArrayLike, recomputed: npt.ArrayLike, *, max_points: int = 4000
+) -> plt.Figure:
+    """Cached float16 features vs a fresh encoder forward pass: they must lie on ``y = x``."""
+    a = np.asarray(cached, dtype=np.float64).ravel()
+    b = np.asarray(recomputed, dtype=np.float64).ravel()
+    if a.size > max_points:
+        idx = np.random.default_rng(0).choice(a.size, size=max_points, replace=False)
+        a, b = a[idx], b[idx]
+    max_abs_err = float(np.max(np.abs(a - b))) if a.size else 0.0
+
+    fig, ax = plt.subplots(figsize=(4.8, 4.6))
+    lo, hi = float(min(a.min(), b.min())), float(max(a.max(), b.max()))
+    ax.plot([lo, hi], [lo, hi], color="#334155", ls="--", lw=1)
+    ax.scatter(a, b, s=6, alpha=0.35, color=ACCENT)
+    ax.set_xlabel("cached (float16)")
+    ax.set_ylabel("fresh encoder forward")
+    ax.set_title(f"Feature-cache round-trip\nmax abs err {max_abs_err:.2e}")
     fig.tight_layout()
     return fig

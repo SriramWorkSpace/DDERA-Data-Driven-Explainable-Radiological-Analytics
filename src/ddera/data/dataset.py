@@ -156,3 +156,43 @@ class CheXpertImageDataset(_LabelledDataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         tensor = self.transform(image=image)["image"]
         return {"image": tensor, **self._enc.label_bundle(i)}
+
+
+class CachedFeatureDataset(_LabelledDataset):
+    """One split as ``(features, concepts, concept_mask, target)`` from the ADR-008 cache.
+
+    Same label contract as :class:`CheXpertImageDataset`, but ``__getitem__`` returns a
+    cached 1024-d encoder feature vector instead of an image. Used by every frozen-encoder
+    CBM variant in Phases 3-6. Construction validates that the cached rows line up with the
+    split, row for row, so a stale cache is caught immediately.
+    """
+
+    def __init__(
+        self,
+        cache_dir: str | Path,
+        split: str,
+        splits_path: str | Path,
+        concept_spec: ConceptSpec,
+        *,
+        concept_policy: str | None = None,
+    ) -> None:
+        from ddera.features.cache import (
+            FeatureCache,  # local: avoids importing torch models eagerly
+        )
+
+        super().__init__(
+            EncodedSplit(splits_path, split, concept_spec, concept_policy=concept_policy)
+        )
+        features, index_df, _ = FeatureCache(cache_dir).load(split)
+        cached_paths = index_df["path"].astype(str).tolist()
+        if cached_paths != self._enc.paths:
+            raise ValueError(
+                f"Cached feature index for split {split!r} does not match splits.parquet "
+                f"({len(cached_paths)} cached rows vs {len(self._enc.paths)} split rows). "
+                "Rebuild the cache after any change to the splits."
+            )
+        self.features = features  # (N, feature_dim) float16 memmap
+
+    def __getitem__(self, i: int) -> dict:
+        feature = torch.from_numpy(np.asarray(self.features[i], dtype=np.float32))
+        return {"features": feature, **self._enc.label_bundle(i)}

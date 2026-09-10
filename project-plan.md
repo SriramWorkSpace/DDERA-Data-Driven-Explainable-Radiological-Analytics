@@ -84,13 +84,19 @@ sweep runs regardless in Phase 5 as the leakage stress test.
 
 ## Phase 2 — Preprocessing & feature cache · *Days 5–6*
 
-- [ ] `05` — preprocessing pipeline; augmentation (**no horizontal flip**, ADR-006)
-- [ ] `ddera/features/cache.py` — float16 memmap + `index.parquet` + `fingerprint.json`
-- [ ] Extract and cache features for all splits
-- [ ] Stale-cache rejection test
+- [~] `05` — preprocessing pipeline; augmentation (**no horizontal flip**, ADR-006)
+      — library done (`data/transforms.py`, `data/dataset.py`, `models/encoder.py`); notebook
+      pending real data
+- [x] `ddera/features/cache.py` — float16 memmap + `{split}_index.parquet` + `fingerprint.json`
+- [x] Stale-cache rejection test (`tests/test_feature_cache.py::TestStaleCacheRejection`)
+- [x] `ddera/features/probe.py` + `tests/test_probe.py` — linear concept probe (GATE 2 helper)
+- [x] Progress figures: `reporting/{theme,plots}.py`, `scripts/visualize_{dataset,preprocessing}.py`
+- [ ] Extract and cache features for all splits *(needs the real CheXpert download)*
 
 > 🔒 **GATE 2.** Cached features load correctly, the fingerprint check rejects a mismatched encoder,
 > and a linear probe on cached features reaches sane concept AUROC (sanity, not a result).
+> — *machinery + fingerprint rejection verified on synthetic data; the probe-on-real-features
+> half of the gate is pending the CheXpert download.*
 
 ---
 
