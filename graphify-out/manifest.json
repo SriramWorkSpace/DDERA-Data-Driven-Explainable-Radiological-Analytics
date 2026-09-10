@@ -18,9 +18,9 @@
     "semantic_hash": "df3bbebfa06fa5275caa844a5bf773a0"
   },
   "src/ddera/config.py": {
-    "mtime": 1789040156.4561274,
-    "seen": 1789040443.9645398,
-    "ast_hash": "750d8af09b9be382549b70525340c910",
+    "mtime": 1789042378.971923,
+    "seen": 1789042825.9175196,
+    "ast_hash": "a67ad29c5e311553b80fb31643baebc9",
     "semantic_hash": ""
   },
   "src/ddera/data/__init__.py": {
@@ -156,9 +156,9 @@
     "semantic_hash": "8da521d5d43ab343839e8c01fda020c6"
   },
   "tests/conftest.py": {
-    "mtime": 1789040381.196979,
-    "seen": 1789040443.9645758,
-    "ast_hash": "60c4c4621521f8f66db6c2e8eb4cb72c",
+    "mtime": 1789042671.9427989,
+    "seen": 1789042825.9175673,
+    "ast_hash": "000ae34835fdd52bbff8b8f3cf384b27",
     "semantic_hash": ""
   },
   "tests/test_cbm_math.py": {
@@ -495,6 +495,96 @@
     "mtime": 1789040760.1927867,
     "seen": 1789040981.8456323,
     "ast_hash": "0f1642eb2fc60982f37eac2a82f7ef24",
+    "semantic_hash": ""
+  },
+  "src/ddera/models/blackbox.py": {
+    "mtime": 1789042216.8459153,
+    "seen": 1789042825.917541,
+    "ast_hash": "0dca3bc499ff8b150c0defcec8acc3e6",
+    "semantic_hash": ""
+  },
+  "src/ddera/models/cbm.py": {
+    "mtime": 1789042209.0116863,
+    "seen": 1789042825.917543,
+    "ast_hash": "a5b39013f2c156bbab312bd8d8a1f47f",
+    "semantic_hash": ""
+  },
+  "src/ddera/models/concept_head.py": {
+    "mtime": 1789042269.8230493,
+    "seen": 1789042825.9175436,
+    "ast_hash": "a17e55060c39f939b108b89299d363d3",
+    "semantic_hash": ""
+  },
+  "src/ddera/models/reasoner.py": {
+    "mtime": 1789042269.8230493,
+    "seen": 1789042825.917548,
+    "ast_hash": "4b620eb5aca58e2c911de735baebc86c",
+    "semantic_hash": ""
+  },
+  "src/ddera/reporting/runs.py": {
+    "mtime": 1789042567.7153566,
+    "seen": 1789042825.9175515,
+    "ast_hash": "e322da8871dd287172405dccb41d039a",
+    "semantic_hash": ""
+  },
+  "src/ddera/train/__main__.py": {
+    "mtime": 1789042567.7153566,
+    "seen": 1789042825.9175558,
+    "ast_hash": "b7b471958ed992f439eaaac867821b89",
+    "semantic_hash": ""
+  },
+  "src/ddera/train/amp.py": {
+    "mtime": 1789042386.4164386,
+    "seen": 1789042825.9175568,
+    "ast_hash": "560fd5cd7fb7f1ad5f73155c1eafeaf0",
+    "semantic_hash": ""
+  },
+  "src/ddera/train/evaluate.py": {
+    "mtime": 1789042567.7073567,
+    "seen": 1789042825.9175575,
+    "ast_hash": "ca96e8188dfe4a76fe39bfdd289f4567",
+    "semantic_hash": ""
+  },
+  "src/ddera/train/loop.py": {
+    "mtime": 1789042588.0741353,
+    "seen": 1789042825.9175582,
+    "ast_hash": "678a5fc45a905adcaad9bec8e5fa5907",
+    "semantic_hash": ""
+  },
+  "src/ddera/train/losses.py": {
+    "mtime": 1789042230.2764308,
+    "seen": 1789042825.9175591,
+    "ast_hash": "c98be51fb7d9fdae46c1278efb496e3e",
+    "semantic_hash": ""
+  },
+  "tests/test_cbm_model.py": {
+    "mtime": 1789042269.8240492,
+    "seen": 1789042825.9175704,
+    "ast_hash": "d8ab9fbc1bb47af4de649612e0e3d189",
+    "semantic_hash": ""
+  },
+  "tests/test_runs.py": {
+    "mtime": 1789042643.143605,
+    "seen": 1789042825.9175806,
+    "ast_hash": "d78fe1d35a4ff863922376cadfa2239a",
+    "semantic_hash": ""
+  },
+  "tests/test_train.py": {
+    "mtime": 1789042734.096186,
+    "seen": 1789042825.9175823,
+    "ast_hash": "16f7bc0138f891f27bdb059aad3f5f0d",
+    "semantic_hash": ""
+  },
+  "configs/experiment/b0_baseline.yaml": {
+    "mtime": 1789042562.104431,
+    "seen": 1789042825.9176018,
+    "ast_hash": "101ab23fe99c41ad1d855870e9c57883",
+    "semantic_hash": ""
+  },
+  "configs/experiment/m2_sequential.yaml": {
+    "mtime": 1789042554.8947296,
+    "seen": 1789042825.9176028,
+    "ast_hash": "6371b0c3fb0302e645565d337e0151bc",
     "semantic_hash": ""
   }
 }

@@ -1,0 +1,35 @@
+# DDERA experiment: B0 black-box baseline (the accuracy ceiling). See ARCHITECTURE section 5.
+#
+# encoder -> Linear(1024 -> 1), no concept bottleneck. NOT an ante-hoc model and never
+# presented as DDERA's method -- it exists only to measure what the bottleneck costs.
+# Fine-tunes the encoder (freeze_encoder: false), so it runs full-GPU and does NOT use the
+# feature cache (ADR-008). Running this on real data is a GPU training job -- start it only
+# with explicit approval.
+
+name: b0_baseline
+seed: 42
+concepts: chexpert_v1
+transforms: transforms_v1
+
+model:
+  variant: b0
+  n_concepts: 12
+  freeze_encoder: false
+  encoder:
+    arch: densenet121
+    weights: IMAGENET1K_V1
+    resolution: 224
+    feature_dim: 1024
+
+epochs: 15
+batch_size: 32
+lr: 0.0001
+weight_decay: 0.0001
+early_stop_patience: 4
+grad_accum_steps: 2
+num_workers: 4
+
+splits_parquet: null
+data_root: null
+feature_cache: null
+subset_patients: null

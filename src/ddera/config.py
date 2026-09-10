@@ -262,3 +262,158 @@ class TransformConfig:
             "contrast_limit": self.contrast_limit,
             "augment_prob": self.augment_prob,
         }
+
+
+#: Model variants (ARCHITECTURE section 5). B0 and M4 are the only ones with a path from
+#: encoder features to the target -- both exist solely to quantify the bottleneck's cost.
+MODEL_VARIANTS = (
+    "b0",  # black-box baseline: encoder -> Linear(1024 -> 1)
+    "m1_independent",  # CBM, reasoner trained on ground-truth concepts
+    "m2_sequential",  # CBM, reasoner trained on predicted concepts (detached)
+    "m3_joint",  # CBM, joint L_target + lambda * L_concept (Phase 4)
+    "m4_hybrid",  # CBM + residual channel of width k (Phase 4)
+)
+
+
+@dataclass(frozen=True)
+class ModelConfig:
+    """Which model to build. See ARCHITECTURE section 5 and ADR-001."""
+
+    variant: str = "m2_sequential"
+    n_concepts: int = 12
+    encoder: EncoderConfig = field(default_factory=EncoderConfig)
+    #: M1 / M2 / M4 keep the encoder frozen (ADR-008 cache path); B0 / M3 fine-tune it.
+    freeze_encoder: bool = True
+    reasoner_bias: bool = True
+    concept_head_dropout: float = 0.0
+    #: M4 only -- width of the residual channel that bypasses the bottleneck (Phase 4).
+    residual_dim: int = 0
+
+    def __post_init__(self) -> None:
+        if self.variant not in MODEL_VARIANTS:
+            raise ValueError(
+                f"Unknown model variant {self.variant!r}; expected one of {MODEL_VARIANTS}"
+            )
+        if self.n_concepts < 1:
+            raise ValueError("A concept bottleneck needs at least one concept.")
+        if self.residual_dim and self.variant != "m4_hybrid":
+            raise ValueError("residual_dim is only meaningful for the m4_hybrid variant.")
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> ModelConfig:
+        raw = load_yaml(path)
+        return cls.from_dict(raw)
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> ModelConfig:
+        enc = raw.get("encoder")
+        encoder = (
+            EncoderConfig(**_encoder_kwargs(enc)) if isinstance(enc, dict) else EncoderConfig()
+        )
+        return cls(
+            variant=raw.get("variant", "m2_sequential"),
+            n_concepts=int(raw.get("n_concepts", 12)),
+            encoder=encoder,
+            freeze_encoder=bool(raw.get("freeze_encoder", True)),
+            reasoner_bias=bool(raw.get("reasoner_bias", True)),
+            concept_head_dropout=float(raw.get("concept_head_dropout", 0.0)),
+            residual_dim=int(raw.get("residual_dim", 0)),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "variant": self.variant,
+            "n_concepts": self.n_concepts,
+            "encoder": self.encoder.to_dict(),
+            "freeze_encoder": self.freeze_encoder,
+            "reasoner_bias": self.reasoner_bias,
+            "concept_head_dropout": self.concept_head_dropout,
+            "residual_dim": self.residual_dim,
+        }
+
+
+def _encoder_kwargs(raw: dict[str, Any]) -> dict[str, Any]:
+    norm = raw.get("normalization", {})
+    kwargs = {
+        k: raw[k] for k in ("arch", "weights", "resolution", "channels", "feature_dim") if k in raw
+    }
+    if "mean" in norm:
+        kwargs["normalization_mean"] = tuple(norm["mean"])
+    if "std" in norm:
+        kwargs["normalization_std"] = tuple(norm["std"])
+    return kwargs
+
+
+@dataclass(frozen=True)
+class ExperimentConfig:
+    """A full experiment, resolved from ``configs/experiment/<name>.yaml``.
+
+    The resolved config is copied verbatim into the run directory (``config.yaml``) so any
+    result reproduces exactly. Data locations are ``None`` in the checked-in configs and
+    filled once Phase 1/2 have run on the real download; ``--synthetic`` bypasses them.
+    """
+
+    name: str
+    model: ModelConfig = field(default_factory=ModelConfig)
+    seed: int = 42
+    concepts: str = "chexpert_v1"  # ConceptSpec name or path
+    transforms: str = "transforms_v1"
+    epochs: int = 20
+    batch_size: int = 64
+    lr: float = 1e-3
+    weight_decay: float = 1e-4
+    early_stop_patience: int = 5
+    concept_loss_weight: float = 1.0  # lambda for the joint regime (Phase 4)
+    grad_accum_steps: int = 1
+    num_workers: int = 0
+    splits_parquet: str | None = None
+    data_root: str | None = None
+    feature_cache: str | None = None
+    #: Scale lever (subset the cohort). Using this on real data requires its own ADR
+    #: (Invariant 10 / ADR-009): it changes scale, never methodology.
+    subset_patients: int | None = None
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> ExperimentConfig:
+        raw = load_yaml(path)
+        model = raw.get("model")
+        return cls(
+            name=raw["name"],
+            model=ModelConfig.from_dict(model) if isinstance(model, dict) else ModelConfig(),
+            seed=int(raw.get("seed", 42)),
+            concepts=raw.get("concepts", "chexpert_v1"),
+            transforms=raw.get("transforms", "transforms_v1"),
+            epochs=int(raw.get("epochs", 20)),
+            batch_size=int(raw.get("batch_size", 64)),
+            lr=float(raw.get("lr", 1e-3)),
+            weight_decay=float(raw.get("weight_decay", 1e-4)),
+            early_stop_patience=int(raw.get("early_stop_patience", 5)),
+            concept_loss_weight=float(raw.get("concept_loss_weight", 1.0)),
+            grad_accum_steps=int(raw.get("grad_accum_steps", 1)),
+            num_workers=int(raw.get("num_workers", 0)),
+            splits_parquet=raw.get("splits_parquet"),
+            data_root=raw.get("data_root"),
+            feature_cache=raw.get("feature_cache"),
+            subset_patients=raw.get("subset_patients"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "model": self.model.to_dict(),
+            "seed": self.seed,
+            "concepts": self.concepts,
+            "transforms": self.transforms,
+            "epochs": self.epochs,
+            "batch_size": self.batch_size,
+            "lr": self.lr,
+            "weight_decay": self.weight_decay,
+            "early_stop_patience": self.early_stop_patience,
+            "concept_loss_weight": self.concept_loss_weight,
+            "grad_accum_steps": self.grad_accum_steps,
+            "num_workers": self.num_workers,
+            "splits_parquet": self.splits_parquet,
+            "data_root": self.data_root,
+            "feature_cache": self.feature_cache,
+            "subset_patients": self.subset_patients,
+        }

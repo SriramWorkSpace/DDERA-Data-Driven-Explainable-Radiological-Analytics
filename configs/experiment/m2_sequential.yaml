@@ -1,0 +1,39 @@
+# DDERA experiment: M2 sequential CBM (the practical default). See ARCHITECTURE section 5.
+#
+# Concept head trained on features -> concepts with masked BCE (ADR-004 u_mask); the linear
+# reasoner is trained on the *predicted* concept vector, detached, so the target loss cannot
+# reshape the concept head. Frozen encoder => trains on the ADR-008 feature cache.
+#
+# splits_parquet / feature_cache are null until Phase 1/2 have run on the real CheXpert
+# download. Until then: `python -m ddera.train --config configs/experiment/m2_sequential.yaml
+# --synthetic` demonstrates the pipeline end to end (output labelled SYNTHETIC).
+
+name: m2_sequential
+seed: 42
+concepts: chexpert_v1
+transforms: transforms_v1
+
+model:
+  variant: m2_sequential
+  n_concepts: 12
+  freeze_encoder: true
+  reasoner_bias: true
+  concept_head_dropout: 0.0
+  encoder:
+    arch: densenet121
+    weights: IMAGENET1K_V1
+    resolution: 224
+    feature_dim: 1024
+
+epochs: 40
+batch_size: 256
+lr: 0.001
+weight_decay: 0.0001
+early_stop_patience: 8
+grad_accum_steps: 1
+num_workers: 0
+
+splits_parquet: null
+data_root: null
+feature_cache: null
+subset_patients: null

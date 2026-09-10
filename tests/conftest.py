@@ -92,6 +92,40 @@ def synthetic_processed(tmp_path):
     return out, raw, spec
 
 
+@pytest.fixture(scope="session")
+def synthetic_cached(tmp_path_factory):
+    """A synthetic feature cache + splits.parquet for the Phase-3 training/eval tests.
+
+    Returns ``(cache_dir, splits_parquet, ConceptSpec)``. Built once per session: synthetic
+    tree -> Phase-1 pipeline -> DenseNet (random init) feature extraction for train + val,
+    at 64px for speed.
+    """
+    from ddera.config import ConceptSpec, EncoderConfig
+    from ddera.data.acquire import build_processed_dataset
+    from ddera.data.dataset import CheXpertImageDataset
+    from ddera.data.transforms import build_eval_transform
+    from ddera.features.cache import FeatureCache
+    from ddera.models.encoder import DenseNet121Encoder
+
+    root = tmp_path_factory.mktemp("synthetic_cached")
+    raw = write_synthetic_chexpert_tree(
+        root / "chexpert", n_patients=60, with_images=True, image_size=64, seed=0
+    )
+    spec = ConceptSpec.from_yaml("configs/concepts/chexpert_v1.yaml")
+    processed = root / "processed"
+    build_processed_dataset(raw, spec, processed, seed=42, check_images=True)
+    splits = processed / "splits.parquet"
+
+    enc_cfg = EncoderConfig(weights=None, resolution=64)
+    encoder = DenseNet121Encoder(enc_cfg, frozen=True)
+    cache = FeatureCache(root / "features")
+    tfm = build_eval_transform(enc_cfg)
+    for split in ("train", "val"):
+        ds = CheXpertImageDataset(splits, split, spec, data_root=raw, transform=tfm)
+        cache.extract(encoder, ds, split, batch_size=16)
+    return cache.root, splits, spec
+
+
 @pytest.fixture
 def reasoner(synth):
     """The TRUE linear reasoner that generated the synthetic targets."""
