@@ -1,0 +1,16 @@
+# DDERA training augmentation v1. See ADR-006.
+#
+# NO horizontal flip, NO vertical flip, NO transpose, NO 90-degree rotation. Chest anatomy
+# is not left-right symmetric: the cardiac silhouette sits left of midline and its apparent
+# size relative to the thorax is exactly what the Cardiomegaly / Enlarged Cardiomediastinum
+# concepts measure. Flipping produces anatomically impossible images and corrupts two of the
+# twelve concepts. ddera.data.transforms.assert_no_reflection enforces this.
+#
+# Augmentation is limited to small affine jitter + brightness/contrast.
+
+rotate_limit_deg: 7.0     # ADR-006: +/- 7 degrees
+scale_limit: 0.05         # ADR-006: +/- 5 %
+shift_limit: 0.05
+brightness_limit: 0.2
+contrast_limit: 0.2
+augment_prob: 0.5

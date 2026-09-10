@@ -14,7 +14,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))  # so `scripts.get_data` imports (namespace package)
@@ -24,75 +23,17 @@ from ddera.data.acquire import build_processed_dataset, inspect_download  # noqa
 from ddera.data.chexpert import load_manifest  # noqa: E402
 from ddera.data.labels import CHEXPERT_OBSERVATIONS  # noqa: E402
 from ddera.data.splits import assert_no_patient_leakage, load_splits  # noqa: E402
+from ddera.data.synthetic import write_synthetic_chexpert_tree  # noqa: E402
 
 CONCEPT_COLS = [c for c in CHEXPERT_OBSERVATIONS if c not in ("No Finding", "Pneumonia")]
+
+# The synthetic CheXpert-download generator lives in ddera.data.synthetic so scripts and
+# tests share one implementation.
+_write_synthetic_chexpert = write_synthetic_chexpert_tree
 
 
 def _spec() -> ConceptSpec:
     return ConceptSpec.from_yaml("configs/concepts/chexpert_v1.yaml")
-
-
-def _write_synthetic_chexpert(
-    root: Path,
-    *,
-    n_patients: int = 60,
-    studies_per_patient: int = 2,
-    with_images: bool = False,
-    n_missing: int = 0,
-    n_corrupt: int = 0,
-    seed: int = 0,
-) -> Path:
-    """Write a miniature CheXpert-v1.0-small tree (train.csv, valid.csv, optional images)."""
-    root = Path(root)
-    ds = root / "CheXpert-v1.0-small"
-    ds.mkdir(parents=True, exist_ok=True)
-    rng = np.random.default_rng(seed)
-
-    rows: list[dict] = []
-    for p in range(n_patients):
-        pid = f"patient{p:05d}"
-        patient_pos = rng.random() < 0.45  # ~45% of patients get a positive study
-        for s in range(studies_per_patient):
-            row = {
-                "Path": f"CheXpert-v1.0-small/train/{pid}/study{s + 1}/view1_frontal.jpg",
-                "Sex": str(rng.choice(["Male", "Female"])),
-                "Age": int(rng.integers(20, 90)),
-                "Frontal/Lateral": "Frontal",
-                "AP/PA": str(rng.choice(["AP", "PA"])),
-            }
-            for obs in CHEXPERT_OBSERVATIONS:
-                row[obs] = float(rng.choice([1.0, 0.0, -1.0, np.nan]))
-            row["Pneumonia"] = (
-                1.0
-                if (patient_pos and s == 0)
-                else float(rng.choice([0.0, 0.0, 0.0, -1.0, np.nan]))
-            )
-            rows.append(row)
-
-    df = pd.DataFrame(rows)
-    if with_images:
-        # Guarantee the first rows survive the target policy so probe counts are stable.
-        df.loc[df.index[:8], "Pneumonia"] = 1.0
-    df.to_csv(ds / "train.csv", index=False)
-
-    valid = df.head(6).copy()
-    valid["Pneumonia"] = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0]
-    valid.to_csv(ds / "valid.csv", index=False)
-
-    if with_images:
-        paths = list(df["Path"])
-        missing = set(paths[:n_missing])
-        corrupt = set(paths[n_missing : n_missing + n_corrupt])
-        for rel in paths:
-            if rel in missing:
-                continue
-            fpath = root / rel
-            fpath.parent.mkdir(parents=True, exist_ok=True)
-            if rel in corrupt:
-                fpath.write_bytes(b"not a real jpeg")
-            else:
-                Image.new("L", (16, 16), color=127).save(fpath, format="JPEG")
-    return root
 
 
 # ---------------------------------------------------------------------------------------

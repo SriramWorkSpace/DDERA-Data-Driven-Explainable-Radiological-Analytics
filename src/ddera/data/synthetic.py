@@ -30,13 +30,15 @@ Two knobs matter for testing specific properties:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from PIL import Image
 
-from ddera.data.labels import UNCERTAIN
+from ddera.data.labels import CHEXPERT_OBSERVATIONS, UNCERTAIN
 
 
 @dataclass
@@ -209,3 +211,92 @@ def make_synthetic_cbm(
 
 def _sigmoid(x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     return 1.0 / (1.0 + np.exp(-np.clip(x, -500, 500)))
+
+
+# ---------------------------------------------------------------------------------------
+# Synthetic CheXpert *download* (CSV + optional JPEG tree)
+# ---------------------------------------------------------------------------------------
+#
+# ``make_synthetic_cbm`` above produces arrays for testing the XAI harness. This produces a
+# miniature on-disk CheXpert-v1.0-small layout for exercising the Phase-1 acquisition
+# pipeline and the Phase-2 image dataset / transforms without the real 11 GB download.
+
+
+def write_synthetic_chexpert_tree(
+    root: str | Path,
+    *,
+    n_patients: int = 60,
+    studies_per_patient: int = 2,
+    with_images: bool = False,
+    n_missing: int = 0,
+    n_corrupt: int = 0,
+    image_size: int = 16,
+    seed: int = 0,
+) -> Path:
+    """Write a miniature ``CheXpert-v1.0-small/`` tree: ``train.csv``, ``valid.csv`` and,
+    when ``with_images``, tiny grayscale JPEGs at the paths the CSV references.
+
+    Args:
+        root: directory to create the tree under. Returned unchanged (it is the ``--dest``).
+        n_patients / studies_per_patient: cohort size; one frontal row per study.
+        with_images: also write JPEG files. ``n_missing`` paths are skipped entirely and
+            ``n_corrupt`` are written as non-decodable bytes, for image-probe / dataset
+            error-path tests.
+        image_size: side length of the generated square JPEGs.
+        seed: RNG seed for the label values and view assignment.
+
+    Returns:
+        ``root`` as a :class:`~pathlib.Path`.
+    """
+    root = Path(root)
+    ds = root / "CheXpert-v1.0-small"
+    ds.mkdir(parents=True, exist_ok=True)
+    rng = np.random.default_rng(seed)
+
+    rows: list[dict[str, Any]] = []
+    for p in range(n_patients):
+        pid = f"patient{p:05d}"
+        patient_positive = rng.random() < 0.45  # ~45 % of patients get a positive study
+        for s in range(studies_per_patient):
+            row: dict[str, Any] = {
+                "Path": f"CheXpert-v1.0-small/train/{pid}/study{s + 1}/view1_frontal.jpg",
+                "Sex": str(rng.choice(["Male", "Female"])),
+                "Age": int(rng.integers(20, 90)),
+                "Frontal/Lateral": "Frontal",
+                "AP/PA": str(rng.choice(["AP", "PA"])),
+            }
+            for observation in CHEXPERT_OBSERVATIONS:
+                row[observation] = float(rng.choice([1.0, 0.0, -1.0, np.nan]))
+            row["Pneumonia"] = (
+                1.0
+                if (patient_positive and s == 0)
+                else float(rng.choice([0.0, 0.0, 0.0, -1.0, np.nan]))
+            )
+            rows.append(row)
+
+    df = pd.DataFrame(rows)
+    if with_images:
+        # Guarantee the first rows survive the ADR-004 target policy, so image-probe and
+        # dataset error-path tests can target known-present rows.
+        df.loc[df.index[:8], "Pneumonia"] = 1.0
+    df.to_csv(ds / "train.csv", index=False)
+
+    valid = df.head(6).copy()
+    valid["Pneumonia"] = [1.0, 0.0, 1.0, 0.0, 1.0, 0.0]
+    valid.to_csv(ds / "valid.csv", index=False)
+
+    if with_images:
+        paths = list(df["Path"])
+        missing = set(paths[:n_missing])
+        corrupt = set(paths[n_missing : n_missing + n_corrupt])
+        for rel in paths:
+            if rel in missing:
+                continue
+            fpath = root / rel
+            fpath.parent.mkdir(parents=True, exist_ok=True)
+            if rel in corrupt:
+                fpath.write_bytes(b"not a real jpeg")
+            else:
+                Image.new("L", (image_size, image_size), color=127).save(fpath, format="JPEG")
+
+    return root

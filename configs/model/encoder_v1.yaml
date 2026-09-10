@@ -1,0 +1,14 @@
+# DDERA vision encoder spec v1. See ADR-001 (DenseNet-121) and ADR-008 (feature cache).
+#
+# Every field here feeds the feature-cache fingerprint: change any of them and all cached
+# features are invalidated -- ddera.features.cache.load() will refuse the stale cache.
+
+arch: densenet121
+weights: IMAGENET1K_V1     # torchvision pretrained weights; null => random init (tests only)
+resolution: 224            # ARCHITECTURE section 7; 320 is the VRAM-probe alternative
+channels: 3
+feature_dim: 1024          # densenet121 penultimate width
+
+normalization:             # ImageNet statistics (DenseNet-121 was pretrained on ImageNet)
+  mean: [0.485, 0.456, 0.406]
+  std:  [0.229, 0.224, 0.225]

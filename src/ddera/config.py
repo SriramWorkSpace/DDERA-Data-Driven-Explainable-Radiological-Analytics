@@ -23,8 +23,15 @@ DATA_ROOT = REPO_ROOT / "data"
 #: Derived data-pipeline artifacts (manifest.parquet, splits.parquet, ...). Gitignored via
 #: ``/data/``. Kept separate from the raw download so ``data/chexpert/`` stays untouched.
 PROCESSED_DATA_ROOT = DATA_ROOT / "processed"
+#: Cached encoder features (ADR-008): ``data/features/<split>.npy`` + index + fingerprint.
+#: Under ``/data/`` so it never enters git.
+FEATURES_ROOT = DATA_ROOT / "features"
 EXPERIMENT_ROOT = REPO_ROOT / "experiments"
 RUNS_ROOT = EXPERIMENT_ROOT / "runs"
+#: Exported figures for notebooks, scripts and the progress report. The directory is
+#: tracked; the generated image files are gitignored (reproducible from the pipeline).
+REPORTS_ROOT = REPO_ROOT / "reports"
+FIGURES_ROOT = REPORTS_ROOT / "figures"
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
@@ -162,4 +169,96 @@ class ConceptSpec:
             "uncertainty": self.uncertainty.__dict__,
             "cohort": self.cohort.__dict__,
             "expected_leakage_watchlist": self.expected_leakage_watchlist,
+        }
+
+
+@dataclass(frozen=True)
+class EncoderConfig:
+    """Vision encoder specification (ADR-001).
+
+    Also the source of the feature-cache fingerprint (ADR-008): a change to any field here
+    invalidates every cached feature, and ``ddera.features.cache`` refuses the stale cache.
+    """
+
+    arch: str = "densenet121"
+    #: torchvision weights enum name, or ``None`` for random init (used only in tests).
+    weights: str | None = "IMAGENET1K_V1"
+    resolution: int = 224
+    channels: int = 3
+    feature_dim: int = 1024
+    normalization_mean: tuple[float, float, float] = (0.485, 0.456, 0.406)
+    normalization_std: tuple[float, float, float] = (0.229, 0.224, 0.225)
+
+    def __post_init__(self) -> None:
+        if self.arch != "densenet121":
+            raise ValueError(f"Only 'densenet121' is supported in v1 (ADR-001); got {self.arch!r}.")
+        if self.channels != 3:
+            raise ValueError("DenseNet-121 ImageNet weights expect 3 input channels.")
+        if len(self.normalization_mean) != 3 or len(self.normalization_std) != 3:
+            raise ValueError("normalization_mean and normalization_std must each have 3 values.")
+        if self.feature_dim != 1024:
+            raise ValueError(f"densenet121 produces 1024-d features, not {self.feature_dim}.")
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> EncoderConfig:
+        raw = load_yaml(path)
+        norm = raw.get("normalization", {})
+        return cls(
+            arch=raw.get("arch", "densenet121"),
+            weights=raw.get("weights", "IMAGENET1K_V1"),
+            resolution=int(raw.get("resolution", 224)),
+            channels=int(raw.get("channels", 3)),
+            feature_dim=int(raw.get("feature_dim", 1024)),
+            normalization_mean=tuple(norm.get("mean", (0.485, 0.456, 0.406))),
+            normalization_std=tuple(norm.get("std", (0.229, 0.224, 0.225))),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "arch": self.arch,
+            "weights": self.weights,
+            "resolution": self.resolution,
+            "channels": self.channels,
+            "feature_dim": self.feature_dim,
+            "normalization_mean": list(self.normalization_mean),
+            "normalization_std": list(self.normalization_std),
+        }
+
+
+@dataclass(frozen=True)
+class TransformConfig:
+    """Training augmentation knobs (ADR-006).
+
+    There are deliberately **no** horizontal/vertical flip or transpose parameters: chest
+    anatomy is not left-right symmetric and flipping corrupts the Cardiomegaly / Enlarged
+    Cardiomediastinum concepts. ``ddera.data.transforms`` also asserts this structurally.
+    """
+
+    rotate_limit_deg: float = 7.0  # ADR-006: +/- 7 degrees
+    scale_limit: float = 0.05  # ADR-006: +/- 5 %
+    shift_limit: float = 0.05
+    brightness_limit: float = 0.2
+    contrast_limit: float = 0.2
+    augment_prob: float = 0.5
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> TransformConfig:
+        raw = load_yaml(path)
+        return cls(
+            rotate_limit_deg=float(raw.get("rotate_limit_deg", 7.0)),
+            scale_limit=float(raw.get("scale_limit", 0.05)),
+            shift_limit=float(raw.get("shift_limit", 0.05)),
+            brightness_limit=float(raw.get("brightness_limit", 0.2)),
+            contrast_limit=float(raw.get("contrast_limit", 0.2)),
+            augment_prob=float(raw.get("augment_prob", 0.5)),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "rotate_limit_deg": self.rotate_limit_deg,
+            "scale_limit": self.scale_limit,
+            "shift_limit": self.shift_limit,
+            "brightness_limit": self.brightness_limit,
+            "contrast_limit": self.contrast_limit,
+            "augment_prob": self.augment_prob,
         }

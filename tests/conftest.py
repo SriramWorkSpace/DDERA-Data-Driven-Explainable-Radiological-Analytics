@@ -15,7 +15,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from ddera.data.synthetic import make_synthetic_cbm  # noqa: E402
+from ddera.data.synthetic import make_synthetic_cbm, write_synthetic_chexpert_tree  # noqa: E402
 from ddera.xai.intervention import LinearReasoner  # noqa: E402
 
 
@@ -70,6 +70,26 @@ def synth_uncertain():
         blank_rate=0.10,
         seed=3,
     )
+
+
+@pytest.fixture
+def synthetic_processed(tmp_path):
+    """Phase-1 artifacts from a synthetic CheXpert tree *with* generated JPEGs.
+
+    Returns ``(processed_dir, data_root, ConceptSpec)`` where ``processed_dir`` holds
+    ``manifest.parquet`` / ``splits.parquet`` and ``data_root`` is what the manifest paths
+    resolve against. Used by the Phase-2 dataset / transforms / reporting tests.
+    """
+    from ddera.config import ConceptSpec
+    from ddera.data.acquire import build_processed_dataset
+
+    raw = write_synthetic_chexpert_tree(
+        tmp_path / "chexpert", n_patients=64, with_images=True, seed=0
+    )
+    spec = ConceptSpec.from_yaml("configs/concepts/chexpert_v1.yaml")
+    out = tmp_path / "processed"
+    build_processed_dataset(raw, spec, out, seed=42, check_images=True)
+    return out, raw, spec
 
 
 @pytest.fixture
