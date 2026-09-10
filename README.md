@@ -197,11 +197,22 @@ pip install -r requirements/base.txt -r requirements/rocm.txt
 export HSA_OVERRIDE_GFX_VERSION=10.3.0
 python scripts/verify_gpu.py
 
-# Acquire data (after accepting the Stanford agreement), then run the notebooks in order
+# Acquire data (after accepting the Stanford agreement)
 python scripts/get_data.py --dest data/chexpert
 
-# Launch the dashboard
+# Train the sequential CBM (M2) and write a run to experiments/runs/
+python -m ddera.train --config configs/experiment/m2_sequential.yaml
+
+# Launch the dashboard (reads experiments/runs/)
 streamlit run app/Home.py
+```
+
+No CheXpert access yet? Every stage runs on synthetic data, clearly labelled:
+
+```bash
+python scripts/visualize_dataset.py --synthetic-demo          # data-distribution figures
+python -m ddera.train --config configs/experiment/m2_sequential.yaml --synthetic
+streamlit run app/Home.py                                     # Explainability Lab, live wⱼ·Δcⱼ
 ```
 
 ### Hardware notes

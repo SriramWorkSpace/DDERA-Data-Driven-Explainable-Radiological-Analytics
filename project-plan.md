@@ -104,20 +104,32 @@ sweep runs regardless in Phase 5 as the leakage stress test.
 
 **The deliverable: a working end-to-end ante-hoc pipeline with real trained numbers, demoable live.**
 
-- [ ] `06` — B0 black-box baseline (DenseNet-121 → target)
-- [ ] `07` — M2 sequential CBM: concept head + linear reasoner
-- [ ] Concept-quality metrics + target metrics with bootstrap CIs
-- [ ] First concept-intervention demonstration
-- [ ] `tests/test_cbm_math.py` — contributions sum exactly to the logit
-- [ ] Streamlit: Home, Data, Model, **Explainability Lab**
+- [x] B0 black-box baseline — `models/blackbox.py` (execution needs a GPU + real data + approval)
+- [x] M2 sequential CBM — `models/{concept_head,reasoner,cbm}.py`, `train/{losses,loop,evaluate}.py`
+- [x] Concept-quality + target metrics with bootstrap CIs — `train/evaluate.py`
+- [x] First concept-intervention demonstration — `app/pages/3_Explainability_Lab.py` (weight-ordered
+      TTI curve in `metrics.json`; live `wⱼ·Δcⱼ` identity in the Lab)
+- [x] Contributions sum exactly to the logit — `tests/test_cbm_model.py` (torch model) +
+      `tests/test_cbm_math.py` (numpy analysis reasoner)
+- [x] `python -m ddera.train` entrypoint; `reporting/runs.py` (Invariant 6 enforcement)
+- [x] Streamlit: Home, Data, Model, **Explainability Lab**, Methodology
+- [~] `06` / `07` notebooks — pending real data (library complete; notebooks import from `src`)
+- [ ] Real M2 training run and B0 baseline — needs the CheXpert download
+
+Built and verified end-to-end on **synthetic** data: `python -m ddera.train --config
+configs/experiment/m2_sequential.yaml --synthetic` trains → evaluates → writes a partial run →
+the app renders it. Every synthetic number is labelled; the mechanism (faithfulness
+correlation 1.000) is exact regardless of the synthetic accuracy.
 
 If full-scale training does not fit the timebox, M1 trains on a **stratified patient-disjoint subset**
-(~20–30k frontal images). Permitted lever is **scale only** — subset size, resolution, epochs.
-Architecture, bottleneck and metric set stay exactly as in the final system, and the decision gets
-its own ADR with the *Effect on the research question* field completed.
+(~20–30k frontal images). Permitted lever is **scale only** — subset size, resolution, epochs
+(`ExperimentConfig.subset_patients`). Architecture, bottleneck and metric set stay exactly as in the
+final system, and the decision gets its own ADR with the *Effect on the research question* field.
 
 > 🔒 **GATE M1.** Upload an X-ray → see concepts → see the contribution waterfall → move a slider →
 > the prediction changes by exactly `wⱼ·Δcⱼ` in logit space. Live, from real trained weights.
+> — *the Lab does all of this now on the synthetic run; "real trained weights" is the one piece
+> still gated on the CheXpert download.*
 
 ---
 

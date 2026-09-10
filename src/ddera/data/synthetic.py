@@ -231,6 +231,7 @@ def write_synthetic_chexpert_tree(
     n_missing: int = 0,
     n_corrupt: int = 0,
     image_size: int = 16,
+    signal_strength: float = 0.0,
     seed: int = 0,
 ) -> Path:
     """Write a miniature ``CheXpert-v1.0-small/`` tree: ``train.csv``, ``valid.csv`` and,
@@ -243,6 +244,11 @@ def write_synthetic_chexpert_tree(
             ``n_corrupt`` are written as non-decodable bytes, for image-probe / dataset
             error-path tests.
         image_size: side length of the generated square JPEGs.
+        signal_strength: 0 (default) makes the ``Pneumonia`` target independent of the
+            concept labels -- correct for pipeline/plumbing tests. ``> 0`` ties the target
+            to a weighted sum of a few concepts (plus noise), so a CBM trained on this tree
+            learns non-trivial reasoner weights -- useful for the ``--synthetic`` mechanism
+            demo. It is still synthetic and never a result.
         seed: RNG seed for the label values and view assignment.
 
     Returns:
@@ -275,6 +281,17 @@ def write_synthetic_chexpert_tree(
             rows.append(row)
 
     df = pd.DataFrame(rows)
+
+    if signal_strength > 0:
+        # Tie the target to a few concepts so a trained CBM has something real to reason
+        # through. Concepts 2/5/6 are radiographic evidence used clinically for pneumonia
+        # (Lung Opacity, Consolidation, Atelectasis in the ADR-003 order).
+        drivers = ["Lung Opacity", "Consolidation", "Atelectasis"]
+        coeffs = np.array([1.2, 1.5, 0.8]) * signal_strength
+        present = np.stack([(df[c].to_numpy() == 1.0).astype(float) for c in drivers], axis=1)
+        logit = present @ coeffs - 1.3 + rng.normal(0.0, 0.6, size=len(df))
+        df["Pneumonia"] = (rng.random(len(df)) < _sigmoid(logit)).astype(float)
+
     if with_images:
         # Guarantee the first rows survive the ADR-004 target policy, so image-probe and
         # dataset error-path tests can target known-present rows.

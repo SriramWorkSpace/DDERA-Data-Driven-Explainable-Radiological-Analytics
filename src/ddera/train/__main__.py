@@ -63,7 +63,12 @@ def _synthetic_datasets(cfg: ExperimentConfig, workdir: Path, spec: ConceptSpec)
 
     enc_cfg = EncoderConfig(weights=None, resolution=96)  # small + offline for the demo path
     raw = write_synthetic_chexpert_tree(
-        workdir / "chexpert", n_patients=64, with_images=True, image_size=96, seed=cfg.seed
+        workdir / "chexpert",
+        n_patients=160,
+        with_images=True,
+        image_size=96,
+        signal_strength=1.5,  # give the demo CBM a real concept -> target relationship
+        seed=cfg.seed,
     )
     processed = workdir / "processed"
     build_processed_dataset(raw, spec, processed, seed=cfg.seed, check_images=True)
@@ -122,12 +127,15 @@ def main(argv: list[str] | None = None) -> int:
         "--out", type=Path, default=RUNS_ROOT, help="runs root (default: %(default)s)"
     )
     parser.add_argument("--epochs", type=int, default=None, help="override cfg.epochs")
+    parser.add_argument("--variant", default=None, help="override cfg.model.variant")
     parser.add_argument("--device", default="auto", choices=("auto", "cpu", "cuda"))
     args = parser.parse_args(argv)
 
     cfg = ExperimentConfig.from_yaml(args.config)
     if args.epochs is not None:
         cfg = dataclasses.replace(cfg, epochs=args.epochs)
+    if args.variant is not None:
+        cfg = dataclasses.replace(cfg, model=dataclasses.replace(cfg.model, variant=args.variant))
     set_seed(cfg.seed)
     spec = ConceptSpec.from_yaml(
         cfg.concepts if "/" in cfg.concepts else f"concepts/{cfg.concepts}.yaml"

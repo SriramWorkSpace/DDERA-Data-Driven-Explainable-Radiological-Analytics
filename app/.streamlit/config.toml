@@ -1,0 +1,14 @@
+# DDERA dashboard theme -- matches ddera.reporting.theme (one accent colour, generous spacing).
+
+[theme]
+primaryColor = "#2563eb"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f1f5f9"
+textColor = "#0f172a"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
