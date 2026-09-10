@@ -72,11 +72,14 @@ class ConceptBottleneckModel(nn.Module):
         else:
             reasoner_input = concept_probs.detach() if self.detach_reasoner_input else concept_probs
 
-        target_logit = self.reasoner(reasoner_input)
         return {
             "concept_logits": concept_logits,
             "concept_probs": concept_probs,
-            "target_logit": target_logit,
+            # regime-dependent, used for the training loss:
+            "target_logit": self.reasoner(reasoner_input),
+            # always from the predicted concepts -- the actual inference pathway, used for
+            # evaluation and the XAI protocol (matters for M1, where training uses GT concepts):
+            "inference_target_logit": self.reasoner(concept_probs),
         }
 
 
@@ -112,3 +115,24 @@ def build_model(cfg: ModelConfig, *, encoder: nn.Module | None = None) -> nn.Mod
         concepts_from=concepts_from,
         detach_reasoner_input=detach,
     )
+
+
+class EncoderWrapped(nn.Module):
+    """Evaluate a frozen-encoder model (built with ``encoder=Identity`` for the cache path)
+    on **image** batches, by running ``encoder`` first. Used for the stability family, which
+    needs concept vectors re-inferred from perturbed images.
+    """
+
+    def __init__(self, encoder: nn.Module, model: nn.Module) -> None:
+        super().__init__()
+        self.encoder = encoder
+        self.model = model
+
+    def forward(self, batch: dict) -> dict[str, torch.Tensor]:
+        if "features" not in batch and "image" in batch:
+            batch = {**batch, "features": self.encoder(batch["image"])}
+        return self.model(batch)
+
+    @property
+    def reasoner(self):  # passthrough so evaluate_model can read the weights
+        return self.model.reasoner

@@ -137,13 +137,15 @@ class TestTrainLoop:
 
 
 class TestEvaluator:
-    def test_partial_metrics_and_predictions_shape(self, synthetic_cached):
+    def test_metrics_and_predictions_shape_without_perturbations(self, synthetic_cached):
         cache_dir, splits, spec = synthetic_cached
         _, vl, _, val = _loaders(cache_dir, splits, spec)
         set_seed(0)
         model = build_model(_cfg().model)
         preds, metrics, weights = evaluate_model(model, vl, spec=spec, device=DEVICE, split="val")
 
+        # No perturbation loaders and no baseline -> stability pending, completeness partial,
+        # so the run stays partial. Everything else is real.
         assert metrics["status"] == "partial"
         assert {
             "predictive",
@@ -151,13 +153,40 @@ class TestEvaluator:
             "concept_quality",
             "faithfulness",
             "intervention",
+            "leakage",
         } <= set(metrics["families_present"])
-        for pending in ("leakage", "completeness", "stability"):
-            assert metrics[pending]["status"] == "pending"
+        assert metrics["stability"]["status"] == "pending"
+        assert metrics["completeness"]["partial_curve"] is True
+        assert set(metrics["intervention"]) == {"random", "uncertainty", "weight", "oracle"}
         assert len(weights["weights"]) == 12
         assert len(preds) == len(val)
         assert "target_prob" in preds.columns
         assert any(c.startswith("concept_prob__") for c in preds.columns)
+
+    def test_perturbation_loaders_and_baseline_make_the_run_complete(self, synthetic_cached):
+        cache_dir, splits, spec = synthetic_cached
+        _, vl, _, _ = _loaders(cache_dir, splits, spec)
+        # Re-use the same val loader as stand-in "perturbations" -- shape is what matters here.
+        pert = {k: _loaders(cache_dir, splits, spec)[1] for k in ("rotate", "noise")}
+        set_seed(0)
+
+        b0 = build_model(ModelConfig(variant="b0", encoder=_cfg().model.encoder))
+        b0_preds, _, _ = evaluate_model(b0, vl, spec=spec, device=DEVICE, split="val")
+
+        model = build_model(_cfg().model)
+        _, metrics, _ = evaluate_model(
+            model,
+            vl,
+            spec=spec,
+            device=DEVICE,
+            split="val",
+            perturbation_loaders=pert,
+            baseline_predictions=b0_preds,
+        )
+        assert metrics["stability"].get("status") != "pending"
+        assert "aggregate" in metrics["stability"]
+        assert metrics["completeness"].get("partial_curve") is not True
+        assert metrics["status"] == "complete"
 
     def test_faithfulness_is_near_perfect_for_the_linear_reasoner(self, synthetic_cached):
         cache_dir, splits, spec = synthetic_cached

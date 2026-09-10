@@ -38,14 +38,29 @@ class TestForward:
         set_seed(0)
         model = build_model(ModelConfig(variant="m2_sequential"))
         out = model(_feature_batch(8))
-        assert set(out) == {"concept_logits", "concept_probs", "target_logit"}
+        assert set(out) == {
+            "concept_logits",
+            "concept_probs",
+            "target_logit",
+            "inference_target_logit",
+        }
         assert out["concept_logits"].shape == (8, K)
         assert out["target_logit"].shape == (8,)
+        assert out["inference_target_logit"].shape == (8,)
         assert torch.all((out["concept_probs"] >= 0) & (out["concept_probs"] <= 1))
 
     def test_m4_is_not_implemented_yet(self):
         with pytest.raises(NotImplementedError, match="Phase 4"):
             build_model(ModelConfig(variant="m4_hybrid"))
+
+    def test_m1_inference_logit_uses_predicted_concepts_not_ground_truth(self):
+        set_seed(0)
+        model = build_model(ModelConfig(variant="m1_independent"))
+        batch = _feature_batch(8)
+        out = model(batch)
+        # training logit runs on the GT concept labels; the inference logit runs on the
+        # predicted concepts -- they must differ (this is what evaluate.py reports on).
+        assert not torch.allclose(out["target_logit"], out["inference_target_logit"])
 
 
 class TestInvariant34ForwardGraph:

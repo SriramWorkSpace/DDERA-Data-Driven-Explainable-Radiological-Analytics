@@ -5,14 +5,14 @@
     python -m ddera.train --config configs/experiment/m2_sequential.yaml --synthetic
 
 ``--synthetic`` builds a small synthetic CheXpert tree, runs the Phase-1 pipeline and (for
-frozen-encoder variants) extracts a feature cache, then trains and evaluates on that. Every
-number it prints and writes is labelled SYNTHETIC -- it is a mechanism demonstration, not a
-result (CLAUDE.md section 8). Real runs need ``splits_parquet`` / ``feature_cache`` set in
-the config (produced by ``scripts/get_data.py`` + feature extraction).
+frozen-encoder variants) extracts a feature cache, then trains and evaluates on that -- and
+also fits a quick B0 baseline and re-infers concepts under three input perturbations, so
+the run reaches all eight metric families. Every number it prints and writes is labelled
+SYNTHETIC: it is a mechanism demonstration, not a result (CLAUDE.md section 8).
 
-Phase 3 writes a **partial** run (predictive, calibration, concept quality, a first
-intervention curve, faithfulness). Leakage / completeness / stability arrive with the
-Phase 5 protocol.
+Real runs need ``splits_parquet`` / ``feature_cache`` in the config (``scripts/get_data.py``
+plus feature extraction). ``--baseline-run <dir>`` supplies a B0 run whose predictions give
+the completeness interpretability-cost.
 """
 
 from __future__ import annotations
@@ -26,16 +26,25 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+import albumentations as A  # noqa: E402
+import cv2  # noqa: E402
 import torch  # noqa: E402
+from albumentations.pytorch import ToTensorV2  # noqa: E402
 from torch import nn  # noqa: E402
 from torch.utils.data import DataLoader  # noqa: E402
 
-from ddera.config import RUNS_ROOT, ConceptSpec, EncoderConfig, ExperimentConfig  # noqa: E402
+from ddera.config import (  # noqa: E402
+    RUNS_ROOT,
+    ConceptSpec,
+    EncoderConfig,
+    ExperimentConfig,
+    ModelConfig,
+)
 from ddera.data.dataset import CachedFeatureDataset, CheXpertImageDataset  # noqa: E402
 from ddera.data.transforms import build_eval_transform  # noqa: E402
-from ddera.models.cbm import build_model  # noqa: E402
+from ddera.models.cbm import EncoderWrapped, build_model  # noqa: E402
 from ddera.models.encoder import DenseNet121Encoder  # noqa: E402
-from ddera.reporting.runs import log_run, new_run_id  # noqa: E402
+from ddera.reporting.runs import load_run, log_run, new_run_id  # noqa: E402
 from ddera.seed import make_generator, seed_worker, set_seed  # noqa: E402
 from ddera.train.evaluate import evaluate_model  # noqa: E402
 from ddera.train.loop import train_model  # noqa: E402
@@ -55,61 +64,156 @@ def _loader(dataset, cfg: ExperimentConfig, *, shuffle: bool) -> DataLoader:
     )
 
 
-def _synthetic_datasets(cfg: ExperimentConfig, workdir: Path, spec: ConceptSpec):
-    """Synthetic tree -> Phase-1 pipeline -> (feature cache) -> train/val datasets."""
+def _perturbing_transform(kind: str, enc: EncoderConfig) -> A.Compose:
+    """An eval transform preceded by one fixed, deterministic perturbation (for stability)."""
+    pre = {
+        "rotate": A.Affine(rotate=(6, 6), border_mode=cv2.BORDER_CONSTANT, fill=0, p=1.0),
+        "brightness": A.RandomBrightnessContrast(
+            brightness_limit=(0.25, 0.25), contrast_limit=0.0, p=1.0
+        ),
+        "noise": A.GaussNoise(std_range=(0.1, 0.15), p=1.0),
+    }[kind]
+    return A.Compose(
+        [
+            pre,
+            A.Resize(enc.resolution, enc.resolution),
+            A.Normalize(mean=enc.normalization_mean, std=enc.normalization_std),
+            ToTensorV2(),
+        ]
+    )
+
+
+def _synthetic(cfg: ExperimentConfig, workdir: Path, spec: ConceptSpec):
     from ddera.data.acquire import build_processed_dataset
     from ddera.data.synthetic import write_synthetic_chexpert_tree
     from ddera.features.cache import FeatureCache
 
-    enc_cfg = EncoderConfig(weights=None, resolution=96)  # small + offline for the demo path
+    enc = EncoderConfig(weights=None, resolution=96)
     raw = write_synthetic_chexpert_tree(
         workdir / "chexpert",
-        n_patients=160,
+        n_patients=200,
         with_images=True,
         image_size=96,
-        signal_strength=1.5,  # give the demo CBM a real concept -> target relationship
+        signal_strength=1.5,
         seed=cfg.seed,
     )
     processed = workdir / "processed"
     build_processed_dataset(raw, spec, processed, seed=cfg.seed, check_images=True)
     splits = processed / "splits.parquet"
-    tfm = build_eval_transform(enc_cfg)
+    tfm = build_eval_transform(enc)
+    encoder = DenseNet121Encoder(enc, frozen=True)
 
-    if cfg.model.variant in _FROZEN_VARIANTS:
+    frozen = cfg.model.variant in _FROZEN_VARIANTS
+    if frozen:
         cache = FeatureCache(workdir / "features")
-        encoder = DenseNet121Encoder(enc_cfg, frozen=True)
         for split in ("train", "val"):
-            ds = CheXpertImageDataset(splits, split, spec, data_root=raw, transform=tfm)
-            cache.extract(encoder, ds, split, batch_size=16)
-        train = CachedFeatureDataset(cache.root, "train", splits, spec)
-        val = CachedFeatureDataset(cache.root, "val", splits, spec)
-        return train, val, None, enc_cfg
+            cache.extract(
+                encoder,
+                CheXpertImageDataset(splits, split, spec, data_root=raw, transform=tfm),
+                split,
+                batch_size=16,
+            )
+        train_ds = CachedFeatureDataset(cache.root, "train", splits, spec)
+        val_ds = CachedFeatureDataset(cache.root, "val", splits, spec)
+        features = cache.load("val")[0][:].astype("float32")
+    else:
+        train_ds = CheXpertImageDataset(splits, "train", spec, data_root=raw, transform=tfm)
+        val_ds = CheXpertImageDataset(splits, "val", spec, data_root=raw, transform=tfm)
+        features = None
 
-    encoder = DenseNet121Encoder(enc_cfg, frozen=False)
-    train = CheXpertImageDataset(splits, "train", spec, data_root=raw, transform=tfm)
-    val = CheXpertImageDataset(splits, "val", spec, data_root=raw, transform=tfm)
-    return train, val, encoder, enc_cfg
+    val_images = CheXpertImageDataset(splits, "val", spec, data_root=raw, transform=tfm)
+    pert = {
+        k: CheXpertImageDataset(
+            splits, "val", spec, data_root=raw, transform=_perturbing_transform(k, enc)
+        )
+        for k in ("rotate", "brightness", "noise")
+    }
+    return {
+        "train": train_ds,
+        "val": val_ds,
+        "val_images": val_images,
+        "perturbations": pert,
+        "features": features,
+        "encoder": encoder if frozen else None,
+        "train_encoder": None if frozen else DenseNet121Encoder(enc, frozen=False),
+        "enc_cfg": enc,
+        "splits": splits,
+        "raw": raw,
+        "spec": spec,
+    }
 
 
-def _real_datasets(cfg: ExperimentConfig, spec: ConceptSpec):
+def _real(cfg: ExperimentConfig, spec: ConceptSpec):
     if not cfg.splits_parquet:
         raise SystemExit(
-            "This config has no data locations. Set splits_parquet / feature_cache (from "
-            "scripts/get_data.py + feature extraction), or run with --synthetic."
+            "This config has no data locations. Set splits_parquet / feature_cache "
+            "(scripts/get_data.py + feature extraction), or run with --synthetic."
         )
     splits = Path(cfg.splits_parquet)
-    if cfg.model.variant in _FROZEN_VARIANTS:
+    frozen = cfg.model.variant in _FROZEN_VARIANTS
+    if frozen:
         if not cfg.feature_cache:
             raise SystemExit("Frozen-encoder variant needs feature_cache set in the config.")
-        train = CachedFeatureDataset(cfg.feature_cache, "train", splits, spec)
-        val = CachedFeatureDataset(cfg.feature_cache, "val", splits, spec)
-        return train, val, None, cfg.model.encoder
+        train_ds = CachedFeatureDataset(cfg.feature_cache, "train", splits, spec)
+        val_ds = CachedFeatureDataset(cfg.feature_cache, "val", splits, spec)
+        return {
+            "train": train_ds,
+            "val": val_ds,
+            "val_images": None,
+            "perturbations": {},
+            "features": None,
+            "encoder": None,
+            "train_encoder": None,
+            "enc_cfg": cfg.model.encoder,
+            "splits": splits,
+            "raw": None,
+            "spec": spec,
+        }
     tfm = build_eval_transform(cfg.model.encoder)
-    root = cfg.data_root
-    train = CheXpertImageDataset(splits, "train", spec, data_root=root, transform=tfm)
-    val = CheXpertImageDataset(splits, "val", spec, data_root=root, transform=tfm)
-    encoder = DenseNet121Encoder(cfg.model.encoder, frozen=cfg.model.freeze_encoder)
-    return train, val, encoder, cfg.model.encoder
+    train_ds = CheXpertImageDataset(splits, "train", spec, data_root=cfg.data_root, transform=tfm)
+    val_ds = CheXpertImageDataset(splits, "val", spec, data_root=cfg.data_root, transform=tfm)
+    return {
+        "train": train_ds,
+        "val": val_ds,
+        "val_images": val_ds,
+        "perturbations": {},
+        "features": None,
+        "encoder": None,
+        "train_encoder": DenseNet121Encoder(cfg.model.encoder, frozen=cfg.model.freeze_encoder),
+        "enc_cfg": cfg.model.encoder,
+        "splits": splits,
+        "raw": None,
+        "spec": spec,
+    }
+
+
+def _fit_baseline(bundle: dict, cfg: ExperimentConfig, device: torch.device) -> object | None:
+    """A quick B0 fit for the completeness reference (synthetic path only)."""
+    b0_cfg = dataclasses.replace(
+        cfg,
+        model=ModelConfig(variant="b0", encoder=bundle["enc_cfg"], freeze_encoder=True),
+        epochs=min(cfg.epochs, 15),
+    )
+    b0 = build_model(b0_cfg.model, encoder=nn.Identity())
+    if bundle["encoder"] is not None:
+        b0 = EncoderWrapped(bundle["encoder"], b0)
+    train_model(
+        b0,
+        _loader(bundle["train"], cfg, shuffle=True),
+        _loader(bundle["val"], cfg, shuffle=False),
+        b0_cfg,
+        device=device,
+        regime="sequential",
+        fast_dev_run=False,
+    )
+    preds, _, _ = evaluate_model(
+        b0,
+        _loader(bundle["val"], cfg, shuffle=False),
+        spec=bundle["spec"],
+        device=device,
+        split="val",
+    )
+    return preds
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -117,17 +221,16 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--config", required=True)
-    parser.add_argument(
-        "--fast-dev-run", action="store_true", help="1 epoch, 2 batches -- a smoke test"
-    )
-    parser.add_argument(
-        "--synthetic", action="store_true", help="train on a synthetic tree (SYNTHETIC)"
-    )
+    parser.add_argument("--fast-dev-run", action="store_true", help="1 epoch, 2 batches")
+    parser.add_argument("--synthetic", action="store_true", help="train on a synthetic tree")
     parser.add_argument(
         "--out", type=Path, default=RUNS_ROOT, help="runs root (default: %(default)s)"
     )
-    parser.add_argument("--epochs", type=int, default=None, help="override cfg.epochs")
+    parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--variant", default=None, help="override cfg.model.variant")
+    parser.add_argument(
+        "--baseline-run", type=Path, default=None, help="a B0 run dir for completeness"
+    )
     parser.add_argument("--device", default="auto", choices=("auto", "cpu", "cuda"))
     args = parser.parse_args(argv)
 
@@ -153,35 +256,61 @@ def main(argv: list[str] | None = None) -> int:
     tmp: tempfile.TemporaryDirectory | None = None
     if args.synthetic:
         tmp = tempfile.TemporaryDirectory()
-        train_ds, val_ds, encoder, enc_cfg = _synthetic_datasets(cfg, Path(tmp.name), spec)
+        bundle = _synthetic(cfg, Path(tmp.name), spec)
     else:
-        train_ds, val_ds, encoder, enc_cfg = _real_datasets(cfg, spec)
+        bundle = _real(cfg, spec)
 
-    model = build_model(cfg.model, encoder=encoder if encoder is not None else nn.Identity())
+    train_encoder = bundle["train_encoder"]
+    model = build_model(
+        cfg.model, encoder=train_encoder if train_encoder is not None else nn.Identity()
+    )
     regime = _REGIME.get(cfg.model.variant, "sequential")
 
     print(
-        f"{'[SYNTHETIC] ' if args.synthetic else ''}training {cfg.model.variant} "
-        f"({regime}) on {len(train_ds)} train / {len(val_ds)} val  [device={device}]"
+        f"{'[SYNTHETIC] ' if args.synthetic else ''}training {cfg.model.variant} ({regime}) "
+        f"on {len(bundle['train'])} train / {len(bundle['val'])} val  [device={device}]"
     )
     history = train_model(
         model,
-        _loader(train_ds, cfg, shuffle=True),
-        _loader(val_ds, cfg, shuffle=False),
+        _loader(bundle["train"], cfg, shuffle=True),
+        _loader(bundle["val"], cfg, shuffle=False),
         cfg,
         device=device,
         regime=regime,
         fast_dev_run=args.fast_dev_run,
     )
 
+    # Evaluation: image path when we have images (enables the stability family).
+    eval_model = model
+    if bundle["val_images"] is not None and bundle["encoder"] is not None:
+        eval_model = EncoderWrapped(bundle["encoder"], model)
+    eval_ds = bundle["val_images"] if bundle["val_images"] is not None else bundle["val"]
+    pert_loaders = {
+        k: _loader(ds, cfg, shuffle=False) for k, ds in bundle["perturbations"].items()
+    } or None
+
+    baseline_predictions = None
+    if args.baseline_run is not None:
+        baseline_predictions = load_run(args.baseline_run).get("predictions")
+    elif args.synthetic and not args.fast_dev_run and cfg.model.variant != "b0":
+        baseline_predictions = _fit_baseline(bundle, cfg, device)
+
     predictions, metrics, concept_weights = evaluate_model(
-        model, _loader(val_ds, cfg, shuffle=False), spec=spec, device=device, split="val"
+        eval_model,
+        _loader(eval_ds, cfg, shuffle=False),
+        spec=spec,
+        device=device,
+        split="val",
+        perturbation_loaders=pert_loaders,
+        features=bundle["features"],
+        baseline_predictions=baseline_predictions,
+        seed=cfg.seed,
     )
     metrics["training"] = history.to_dict()
     metrics["synthetic"] = bool(args.synthetic)
     config_dict = cfg.to_dict()
     config_dict["_synthetic"] = bool(args.synthetic)
-    config_dict["_resolved_encoder"] = enc_cfg.to_dict()
+    config_dict["_resolved_encoder"] = bundle["enc_cfg"].to_dict()
 
     run_dir = Path(args.out) / new_run_id(cfg.model.variant)
     paths = log_run(
@@ -191,10 +320,9 @@ def main(argv: list[str] | None = None) -> int:
         predictions=predictions,
         concept_weights=concept_weights,
         checkpoint=model.state_dict(),
-        partial=True,
+        partial=(metrics["status"] != "complete"),
         index_csv=Path(args.out) / "runs_index.csv",
     )
-
     if tmp is not None:
         tmp.cleanup()
 

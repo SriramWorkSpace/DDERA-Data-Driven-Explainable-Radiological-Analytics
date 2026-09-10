@@ -130,7 +130,9 @@ src/ddera/
 ├── train/
 │   ├── loop.py            train/validate/early-stop; regime-aware
 │   ├── losses.py          masked BCE (uncertainty-aware), joint CBM loss with λ
-│   └── amp.py             autocast (bf16 preferred, fp16 fallback), grad accumulation
+│   ├── amp.py             autocast (bf16 preferred, fp16 fallback), grad accumulation
+│   ├── evaluate.py        run the model → predictions.parquet → run_protocol → metrics.json
+│   └── __main__.py        `python -m ddera.train --config … [--fast-dev-run] [--synthetic]`
 │
 ├── eval/
 │   ├── metrics.py         AUROC, AUPRC, F1, sensitivity, specificity, confusion matrix
@@ -138,6 +140,7 @@ src/ddera/
 │   └── bootstrap.py       stratified bootstrap CIs (n=1000) — mandatory on headline metrics
 │
 ├── xai/                   ★ THE METHODOLOGICAL CONTRIBUTION — domain-agnostic by construction
+│   ├── protocol.py        run_protocol(): all 8 families from predictions.parquet alone
 │   ├── intervention.py    contributions(), intervene(), TTI curves, faithfulness
 │   ├── leakage.py         residual probes, concept-permutation necessity tests
 │   ├── stability.py       perturbation → concept drift, rank stability, flip rate
@@ -145,7 +148,7 @@ src/ddera/
 │   └── posthoc.py         Grad-CAM / SHAP / LIME — B0 BASELINES ONLY (Invariant 5)
 │
 └── reporting/
-    ├── runs.py            log_run(), load_run(), compare_runs(); completeness enforcement
+    ├── runs.py            log_run(), load_run(), compare_runs(); 8-family enforcement
     ├── plots.py           every figure in the repo
     └── theme.py           one shared visual system
 ```

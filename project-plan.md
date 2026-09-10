@@ -151,16 +151,24 @@ final system, and the decision gets its own ADR with the *Effect on the research
 
 The reusable methodological contribution. All of `src/ddera/xai`, domain-agnostic by construction.
 
-- [ ] `10` — intervention experiments: TTI curves under 4 orderings (random, by uncertainty,
-      by `|wⱼ|`, oracle-worst-first)
-- [ ] `11` — the protocol: concept quality · leakage (residual probe + permutation necessity) ·
-      faithfulness (`∂p/∂cⱼ` vs `wⱼ`) · stability · calibration · bootstrap CIs
-- [ ] Leave-one-out target sweep as the leakage stress test
-- [ ] `13` — error analysis: the five failure buckets
-- [ ] `reporting/runs.py` enforces all 8 metric families before marking a run complete
+- [x] `src/ddera/xai/protocol.py` — `run_protocol()` assembles all 8 families from
+      `predictions.parquet` + `concept_weights.json` alone (no GPU, no live model). Wired into
+      `train/evaluate.py`; a `--synthetic` run reaches `status: complete`.
+- [x] Intervention: TTI curves under all 4 orderings (`tti_all_strategies`, already in `xai/`)
+- [x] Leakage: permutation necessity + soft-vs-hard + residual probe (`leakage_report`)
+- [x] Faithfulness (`∂p/∂cⱼ` vs `wⱼ`), calibration, bootstrap CIs
+- [x] Stability: concept drift / rank stability / flip rate under 3 input perturbations
+      (rotate, brightness, noise re-inference at eval time)
+- [x] `reporting/runs.py` enforces all 8 metric families before marking a run complete
+      (`IncompleteRunError`; `missing_families` also flags partial families)
+- [~] Completeness — this run's bottleneck point + interpretability cost vs a B0 baseline; the
+      full residual-k **curve** is the Phase 4 M4 sweep
+- [ ] `10` / `11` / `13` notebooks, the leave-one-out target sweep, the five failure buckets —
+      pending real data
 
 > 🔒 **GATE 5.** Every claim about interpretability is backed by a number with a CI. Any concept
 > whose permutation test shows no effect is reported as decorative — findings are not filtered.
+> — *the protocol computes all of this now; the numbers become results with the CheXpert download.*
 
 ---
 

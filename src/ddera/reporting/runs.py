@@ -80,11 +80,18 @@ def new_run_id(variant: str, *, now: datetime | None = None) -> str:
 
 
 def missing_families(metrics: dict[str, Any]) -> list[str]:
-    """Families absent or still marked ``pending``."""
+    """Families absent, still ``pending``, or only partially computed (e.g. a completeness
+    point without the residual-k curve, or without a baseline for the interpretability cost).
+    """
     out = []
     for fam in REQUIRED_METRIC_FAMILIES:
         value = metrics.get(fam)
-        if not isinstance(value, dict) or value.get("status") == "pending":
+        if (
+            not isinstance(value, dict)
+            or value.get("status") == "pending"
+            or value.get("partial_curve")
+            or value.get("partial")
+        ):
             out.append(fam)
     return out
 
